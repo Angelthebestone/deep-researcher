@@ -1,0 +1,69 @@
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vigilador-tecnologico:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - vigilador-data:/app/.vigilador_data
+    environment:
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      - broker
+
+  dashboard-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api-gateway:8000
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+    depends_on:
+      - api-gateway
+
+  document-ingest-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vigilador-tecnologico:latest
+    command: ["python", "-c", "import time; time.sleep(3600)"]
+    volumes:
+      - vigilador-data:/app/.vigilador_data
+    environment:
+      WORKER_ROLE: document-ingest
+    depends_on:
+      - broker
+    profiles:
+      - workers
+
+  research-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vigilador-tecnologico:latest
+    command: ["python", "-c", "import time; time.sleep(3600)"]
+    volumes:
+      - vigilador-data:/app/.vigilador_data
+    environment:
+      WORKER_ROLE: research
+    depends_on:
+      - broker
+    profiles:
+      - workers
+
+  broker:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+volumes:
+  vigilador-data:
+  rabbitmq-data:

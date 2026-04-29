@@ -1,0 +1,306 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import shutil
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+from uuid import uuid4
+
+from vigilador_tecnologico.api import sse_routes
+from vigilador_tecnologico.storage.operations import OperationJournal
+
+
+REAL_ASYNCIO_SLEEP = asyncio.sleep
+
+
+async def _noop_sleep(*args, **kwargs):
+    return await REAL_ASYNCIO_SLEEP(0)
+
+
+def _parse_sse_chunk(chunk: str | bytes) -> dict[str, object]:
+    if isinstance(chunk, bytes):
+        chunk = chunk.decode("utf-8")
+    return json.loads(chunk.removeprefix("data: ").strip())
+
+
+class _PromptJournalStub:
+    def record_event(self, *args, **kwargs):
+        return None
+
+    def mark_running(self, operation_id, *, message=None, details=None, event_key=None):
+        return {
+            "operation_id": operation_id,
+            "operation_type": "research",
+            "status": "running",
+            "details": details or {},
+            "message": message or "",
+        }
+
+    def mark_failed(self, *args, **kwargs):
+        return None
+
+
+class _DuplicateSafeGraphApp:
+    async def astream_events(self, initial_state, version="v1"):
+        yield {
+            "event": "on_chain_end",
+            "name": "planificador_node",
+            "data": {
+                "output": {
+                    "research_plan": {
+                        "plan_id": "plan-1",
+                        "query": initial_state["query"],
+                        "target_technology": initial_state["target_technology"],
+                        "breadth": initial_state["breadth"],
+                        "depth": initial_state["depth"],
+                        "execution_mode": "serial",
+                        "plan_summary": "Serial plan",
+                        "branches": [
+                            {
+                                "branch_id": "gemini-grounded",
+                                "provider": "gemini_grounded",
+                                "objective": "Grounded evidence",
+                                "queries": ["plasma gasification biomass"],
+                                "max_iterations": 2,
+                                "search_model": "gemini-3.1-flash-lite-preview",
+                                "review_model": "gemma-4-26b-a4b-it",
+                                "embedding_model": "gemini-embedding-2",
+                            }
+                        ],
+                        "consolidation_model": "gemini-3-flash-preview",
+                    },
+                    "queries_to_run": ["plasma gasification biomass"],
+                    "stage_context": {
+                        "stage": "ResearchPlanCreated",
+                        "model": "gemma-4-31b-it",
+                        "plan_id": "plan-1",
+                    },
+                }
+            },
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "reporte_node",
+            "data": {
+                "output": {
+                    "final_report": "# Report\n\nPlanner reached synthesizer.",
+                    "stage_context": {
+                        "stage": "ResearchCompleted",
+                        "model": "gemini-3-flash-preview",
+                        "plan_id": "plan-1",
+                    },
+                }
+            },
+        }
+
+
+class _ResearchProgressGraphApp:
+    async def astream_events(self, initial_state, version="v1"):
+        yield {
+            "event": "on_chain_end",
+            "name": "planificador_node",
+            "data": {
+                "output": {
+                    "research_plan": {
+                        "plan_id": "plan-1",
+                        "query": initial_state["query"],
+                        "target_technology": initial_state["target_technology"],
+                        "breadth": initial_state["breadth"],
+                        "depth": initial_state["depth"],
+                        "execution_mode": "serial",
+                        "plan_summary": "Serial plan",
+                        "branches": [
+                            {
+                                "branch_id": "gemini-grounded",
+                                "provider": "gemini_grounded",
+                                "objective": "Grounded evidence",
+                                "queries": ["plasma gasification biomass"],
+                                "max_iterations": 2,
+                                "search_model": "gemini-3.1-flash-lite-preview",
+                                "review_model": "gemma-4-26b-a4b-it",
+                                "embedding_model": "gemini-embedding-2",
+                            }
+                        ],
+                        "consolidation_model": "gemini-3-flash-preview",
+                    },
+                    "queries_to_run": ["plasma gasification biomass"],
+                    "stage_context": {
+                        "stage": "ResearchPlanCreated",
+                        "model": "gemma-4-31b-it",
+                        "plan_id": "plan-1",
+                    },
+                }
+            },
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "extraccion_web_node",
+            "data": {
+                "output": {
+                    "branch_results": [
+                        {
+                            "branch_id": "gemini-grounded",
+                            "provider": "gemini_grounded",
+                            "executed_queries": ["plasma gasification biomass"],
+                            "learnings": ["Plasma gasification has active research."],
+                            "source_urls": ["https://example.com/research"],
+                            "iterations": 1,
+                            "embeddings": [],
+                        }
+                    ],
+                    "learnings": ["Plasma gasification has active research."],
+                    "visited_urls": ["https://example.com/research"],
+                    "embeddings": [],
+                    "stage_context": {
+                        "stage": "ResearchNodeEvaluated",
+                        "model": "gemma-4-26b-a4b-it",
+                        "branch_id": "gemini-grounded",
+                    },
+                }
+            },
+        }
+        yield {
+            "event": "on_chain_end",
+            "name": "reporte_node",
+            "data": {
+                "output": {
+                    "final_report": "# Report\n\nPlanner reached synthesizer.",
+                    "stage_context": {
+                        "stage": "ResearchCompleted",
+                        "model": "gemini-3-flash-preview",
+                        "plan_id": "plan-1",
+                    },
+                }
+            },
+        }
+
+
+class SSEStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.temp_dir = Path.cwd() / ".codex-test-tmp" / f"sse-{uuid4().hex}"
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(lambda: shutil.rmtree(self.temp_dir, ignore_errors=True))
+        self.operation_journal = OperationJournal(base_dir=self.temp_dir)
+
+    async def test_chat_stream_emits_prompt_then_research_requested(self):
+        async def _fake_improve_query(query: str):
+            return {
+                "refined_query": "Deep technical and market research on plasma gasification for biomass",
+                "target_technology": "Gasificación por plasma para biomasa",
+                "suggested_breadth": 3,
+                "suggested_depth": 2,
+                "keywords": ["plasma gasification", "biomass syngas"],
+            }
+
+        captured: dict[str, object] = {}
+
+        def _fake_ensure_operation(request, *, start_requested=True):
+            captured["start_requested"] = start_requested
+            operation = {
+                "operation_id": "chat-op-1",
+                "operation_type": "research",
+                "subject_id": request["document_id"],
+                "status": "running",
+                "idempotency_key": request["idempotency_key"],
+            }
+            return operation, False
+
+        async def _fake_research_event_stream(request, *, custom_query=None, **kwargs):
+            captured["custom_query"] = custom_query
+            payload = {
+                "event_id": "research-event-1",
+                "sequence": 3,
+                "operation_id": "chat-op-1",
+                "operation_type": "research",
+                "operation_status": "running",
+                "event_type": "ResearchRequested",
+                "status": "ResearchRequested",
+                "message": "ResearchRequested",
+                "nodo": "research-orchestrator",
+                "document_id": request["document_id"],
+                "technology": request["target_technology"],
+                "idempotency_key": request["idempotency_key"],
+                "details": {
+                    "stage_context": {
+                        "stage": "ResearchRequested",
+                        "model": "serial-coordinator",
+                        "breadth": request["breadth"],
+                        "depth": request["depth"],
+                    }
+                },
+                "stage_context": {
+                    "stage": "ResearchRequested",
+                    "model": "serial-coordinator",
+                    "breadth": request["breadth"],
+                    "depth": request["depth"],
+                },
+            }
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+        with (
+            patch.object(sse_routes.prompt_engineering_service, "improve_query", new=_fake_improve_query),
+            patch.object(sse_routes, "_ensure_research_operation", new=_fake_ensure_operation),
+            patch.object(sse_routes, "research_event_stream", new=_fake_research_event_stream),
+            patch.object(sse_routes, "operation_journal", new=_PromptJournalStub()),
+        ):
+            response = await sse_routes.stream_chat_research(
+                "investiga sobre Gasificación por plasma para biomasa",
+                idempotency_key="chat-plasma-1",
+            )
+            payloads = []
+            async for chunk in response.body_iterator:
+                payloads.append(_parse_sse_chunk(chunk))
+
+        self.assertEqual(captured["start_requested"], False)
+        self.assertEqual(
+            [payload["event_type"] for payload in payloads],
+            ["PromptImprovementStarted", "PromptImproved", "ResearchRequested"],
+        )
+        self.assertEqual(captured["custom_query"], "Deep technical and market research on plasma gasification for biomass")
+        self.assertEqual([payload["sequence"] for payload in payloads], [1, 2, 3])
+        self.assertEqual(payloads[0]["stage_context"]["stage"], "PromptImprovementStarted")
+        self.assertEqual(payloads[1]["stage_context"]["stage"], "PromptImproved")
+        self.assertEqual(payloads[2]["stage_context"]["stage"], "ResearchRequested")
+
+    async def test_research_stream_emits_requested_then_planner_then_node_evaluation_then_completed(self):
+        request = sse_routes._build_research_request(
+            "Analyze Plasma Gasification for Biomass",
+            breadth=3,
+            depth=2,
+            idempotency_key="research-plasma-1",
+        )
+        with (
+            patch.object(sse_routes, "graph_app", new=_ResearchProgressGraphApp()),
+            patch.object(sse_routes, "operation_journal", new=self.operation_journal),
+            patch.object(sse_routes.asyncio, "sleep", _noop_sleep),
+        ):
+            payloads = []
+            async for chunk in sse_routes.research_event_stream(request):
+                payloads.append(_parse_sse_chunk(chunk))
+
+        self.assertEqual(
+            [payload["event_type"] for payload in payloads],
+            ["ResearchRequested", "ResearchPlanCreated", "ResearchNodeEvaluated", "ResearchCompleted"],
+        )
+        self.assertEqual([payload["sequence"] for payload in payloads], [1, 2, 3, 4])
+        self.assertEqual(payloads[1]["nodo"], "planificador_node")
+        self.assertEqual(payloads[2]["nodo"], "extraccion_web_node")
+        self.assertEqual(payloads[1]["stage_context"]["model"], "gemma-4-31b-it")
+        self.assertEqual(payloads[2]["stage_context"]["model"], "gemma-4-26b-a4b-it")
+        self.assertEqual(payloads[-1]["stage_context"]["stage"], "ResearchCompleted")
+        self.assertEqual(payloads[-1]["stage_context"]["model"], "gemini-3-flash-preview")
+        self.assertTrue(str(payloads[-1]["report_markdown"]).startswith("# Report"))
+
+    def test_build_research_request_normalizes_spanish_query(self):
+        request = sse_routes._build_research_request(
+            "investiga sobre Gasificación por plasma para biomasa.",
+            breadth=3,
+            depth=2,
+            idempotency_key="chat-plasma-2",
+        )
+
+        self.assertEqual(request["target_technology"], "Gasificación por plasma para biomasa")
+        self.assertEqual(request["document_id"], "research-gasificaci-n-por-plasma-para-biomasa")
+        self.assertEqual(request["idempotency_key"], "chat-plasma-2")
