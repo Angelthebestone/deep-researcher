@@ -4,7 +4,9 @@ Base inicial del sistema empresarial de vigilancia tecnologica basado en agentes
 Para las proximas versiónes se añadirá
 
 *Mejora de la visualización de la cadena de pensamiento del front-end.
+
 *Chats que guardan memoria única e independiente que permita manejar, crear chats con documentos guardados.
+
 *modificación de plan de personalización de plan de investigación.
 
 ## Diagrama de arquitectura
