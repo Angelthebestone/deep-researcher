@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Callable
+
+logger = logging.getLogger("vigilador_tecnologico.workers.orchestrator")
 
 from vigilador_tecnologico.contracts.models import (
     ComparisonItem,
@@ -377,7 +380,7 @@ class PipelineOrchestrator:
         *,
         node_name: str | None = None,
     ) -> None:
-        storage_service.audit.append(event_type, document_id, details)
+        logger.info(event_type, extra={"document_id": document_id, **details})
         if record_event is not None:
             record_event(event_type, details, node_name)
 

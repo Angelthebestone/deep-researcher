@@ -62,7 +62,7 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
         extraction_patcher.start()
         self.addCleanup(extraction_patcher.stop)
 
-        raw_content = b"FastAPI\nLangGraph"
+        raw_content = b"FastAPI\nPostgreSQL"
         content = base64.b64encode(raw_content).decode("ascii")
         upload_payload = {
             "filename": "source-a.txt",
@@ -92,18 +92,18 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
                         "document_id": document_id,
                         "source_type": source_type,
                         "page_number": 1,
-                        "raw_text": "LangGraph",
-                        "technology_name": "LangGraph",
-                        "normalized_name": "LangGraph",
-                        "category": "framework",
+                        "raw_text": "PostgreSQL",
+                        "technology_name": "PostgreSQL",
+                        "normalized_name": "PostgreSQL",
+                        "category": "database",
                         "confidence": 0.98,
                         "evidence_spans": [
                             {
                                 "evidence_id": f"{document_id}:evidence:1",
                                 "page_number": 1,
                                 "start_char": 0,
-                                "end_char": 9,
-                                "text": "LangGraph",
+                                "end_char": 10,
+                                "text": "PostgreSQL",
                                 "evidence_type": "text",
                             }
                         ],
@@ -115,7 +115,7 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
         extraction_patcher.start()
         self.addCleanup(extraction_patcher.stop)
 
-        content = base64.b64encode(b"LangGraph").decode("ascii")
+        content = base64.b64encode(b"PostgreSQL").decode("ascii")
         upload_response = self.client.post(
             "/api/v1/documents/upload",
             json={"filename": "source-a.txt", "content": content, "source_type": "text"},
@@ -129,7 +129,7 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
         self.assertIsNone(status_response.json().get("error"))
         parsed_path = self.storage.base_dir / document_id / "parsed.json"
         self.assertTrue(parsed_path.exists())
-        self.assertEqual(json.loads(parsed_path.read_text(encoding="utf-8"))["raw_text"], "LangGraph")
+        self.assertEqual(json.loads(parsed_path.read_text(encoding="utf-8"))["raw_text"], "PostgreSQL")
 
         extract_response = self.client.post(f"/api/v1/documents/{document_id}/extract")
         self.assertEqual(extract_response.status_code, 200)
@@ -157,18 +157,18 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
                         "document_id": document_id,
                         "source_type": source_type,
                         "page_number": 1,
-                        "raw_text": "LangGraph",
-                        "technology_name": "LangGraph",
-                        "normalized_name": "LangGraph",
-                        "category": "framework",
+                        "raw_text": "PostgreSQL",
+                        "technology_name": "PostgreSQL",
+                        "normalized_name": "PostgreSQL",
+                        "category": "database",
                         "confidence": 0.98,
                         "evidence_spans": [
                             {
                                 "evidence_id": f"{document_id}:evidence:1",
                                 "page_number": 1,
                                 "start_char": 0,
-                                "end_char": 9,
-                                "text": "LangGraph",
+                                "end_char": 10,
+                                "text": "PostgreSQL",
                                 "evidence_type": "text",
                             }
                         ],
@@ -181,7 +181,7 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
         extraction_patcher.start()
         self.addCleanup(extraction_patcher.stop)
 
-        content = base64.b64encode(b"LangGraph").decode("ascii")
+        content = base64.b64encode(b"PostgreSQL").decode("ascii")
         upload_response = self.client.post(
             "/api/v1/documents/upload",
             json={"filename": "source-a.txt", "content": content, "source_type": "text"},
@@ -206,11 +206,11 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
         self.assertEqual(body["status"], "EXTRACTED")
         self.assertEqual(body["mention_count"], 1)
         self.assertEqual(body["normalized_count"], 0)
-        self.assertEqual(body["extracted"][0]["technology_name"], "LangGraph")
+        self.assertEqual(body["extracted"][0]["technology_name"], "PostgreSQL")
         self.assertEqual(fake_extraction_service.calls, 1)
 
     def test_upload_document_persists_and_returns_stable_identifier(self) -> None:
-        raw_content = b"FastAPI\nLangGraph"
+        raw_content = b"FastAPI\nPostgreSQL"
         content = base64.b64encode(raw_content).decode("ascii")
         payload = {
             "filename": "source-a.txt",
@@ -224,7 +224,7 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
 
         expected_document_id = f"doc-{hashlib.sha256(raw_content).hexdigest()[:16]}"
         self.assertEqual(first_body["document_id"], expected_document_id)
-        self.assertEqual(first_body["raw_text"], "FastAPI\nLangGraph")
+        self.assertEqual(first_body["raw_text"], "FastAPI\nPostgreSQL")
         self.assertEqual(first_body["page_count"], 1)
         self.assertTrue(first_body["source_uri"].startswith("file:///"))
 

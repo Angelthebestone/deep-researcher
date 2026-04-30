@@ -314,6 +314,8 @@ export interface AnalysisStreamEvent {
   report?: TechnologyReport | string;
 }
 
+export type ChatStreamEvent = AnalysisStreamEvent;
+
 export interface DashboardSnapshot {
   documentId: string;
   uploadedDocument?: DocumentUploadResponse | null;

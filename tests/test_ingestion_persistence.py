@@ -25,7 +25,7 @@ class _LocalAdapter:
             source_uri=source_uri,
             source_type="pdf",
             mime_type="application/pdf",
-            raw_text="FastAPI\nLangGraph",
+            raw_text="FastAPI\nPostgreSQL",
             page_count=2,
         )
 
@@ -51,7 +51,7 @@ class _OrderedModelAdapter(ModelDocumentIngestionAdapter):
             source_uri=source_uri,
             source_type="pdf",
             mime_type=mime_type,
-            raw_text="FastAPI\nLangGraph",
+            raw_text="FastAPI\nPostgreSQL",
             page_count=2,
             ingestion_engine="gemini",
             model=model,
@@ -81,7 +81,7 @@ class _TimeoutAwareOrderedModelAdapter(ModelDocumentIngestionAdapter):
             source_uri=source_uri,
             source_type="pdf",
             mime_type=mime_type,
-            raw_text="FastAPI\nLangGraph",
+            raw_text="FastAPI\nPostgreSQL",
             page_count=2,
             ingestion_engine="gemini",
             model=model,
@@ -115,7 +115,7 @@ class IngestionPersistenceTest(unittest.TestCase):
 
         result = adapter.ingest("source.pdf", "pdf")
 
-        self.assertEqual(result.raw_text, "FastAPI\nLangGraph")
+        self.assertEqual(result.raw_text, "FastAPI\nPostgreSQL")
         self.assertEqual(result.page_count, 2)
         self.assertEqual(result.ingestion_engine, "local")
         self.assertIn("simulated Gemini quota failure", result.fallback_reason or "")

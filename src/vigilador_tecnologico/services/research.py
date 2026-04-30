@@ -16,7 +16,7 @@ from vigilador_tecnologico.contracts.models import (
     TechnologyResearch,
 )
 from vigilador_tecnologico.integrations import GeminiAdapter, MistralAdapter
-from vigilador_tecnologico.integrations.model_profiles import GEMINI_WEB_SEARCH_MODEL, WEB_SEARCH_TOOLS
+from vigilador_tecnologico.integrations.model_profiles import GEMINI_WEB_SEARCH_MODEL, GEMMA_4_26B_MODEL, MISTRAL_REVIEW_MODEL, WEB_SEARCH_TOOLS
 from vigilador_tecnologico.integrations.retry import call_with_retry
 from ._fallback import (
     ResponsePayloadError,
@@ -35,6 +35,13 @@ from ._text_utils import (
     optional_text,
 )
 from ._stage_context import build_stage_context
+
+# Imports para execute_full_research (evitar import circular si se llama desde estos módulos)
+from .planning import PlanningService
+from .web_search import WebSearchService
+from .research_analysis import ResearchAnalysisService
+from .embedding import EmbeddingService
+from .synthesizer import SynthesizerService
 
 
 _ALLOWED_STATUSES = {"current", "deprecated", "emerging", "unknown"}
@@ -165,20 +172,12 @@ class ResearchService:
             breadth: Máximo de queries únicas por ronda (default: 3)
             depth: Profundidad máxima (default: 1)
             progress_callback: Callback para progreso (stage_name, context_dict)
-        
+
         Returns:
             ResearchExecutionResult con plan, branch_results, report y stage_context
         """
-        # Lazy imports para evitar dependencias circulares
-        from .planning import PlanningService
-        from .web_search import WebSearchService
-        from .research_analysis import ResearchAnalysisService
-        from .embedding import EmbeddingService
-        from .synthesizer import SynthesizerService
-        
         started_at = perf_counter()
-        
-    
+
         planning_service = PlanningService()
         plan, plan_context = planning_service.create_research_plan(
             target_technology=target_technology,
@@ -186,16 +185,22 @@ class ResearchService:
             breadth=breadth,
             depth=depth,
         )
-        
+
         if progress_callback:
             progress_callback("ResearchPlanCreated", plan_context)
-        
-        # 2. Inicializar servicios de ejecución
-        web_search_service = WebSearchService()
-        research_analysis_service = ResearchAnalysisService()
+
+        gemini_adapter = self.adapter or GeminiAdapter(model=self.model)
+        mistral_adapter = self.fallback_adapter or MistralAdapter(model=self.fallback_model)
+        web_search_service = WebSearchService(
+            gemini_adapter=gemini_adapter,
+            mistral_adapter=mistral_adapter,
+        )
+        research_analysis_service = ResearchAnalysisService(
+            gemma_adapter=GeminiAdapter(model=GEMMA_4_26B_MODEL),
+            mistral_review_adapter=MistralAdapter(model=MISTRAL_REVIEW_MODEL),
+        )
         embedding_service = EmbeddingService()
-        
-        # 3. Ejecución serial de ramas
+
         branch_results: list[ResearchBranchResult] = []
         for branch in plan["branches"]:
             branch_result = await self._execute_branch(
@@ -209,7 +214,7 @@ class ResearchService:
                 embedding_service=embedding_service,
             )
             branch_results.append(branch_result)
-            
+
             if progress_callback:
                 progress_callback("ResearchNodeEvaluated", {
                     "branch_id": branch_result["branch_id"],
@@ -217,7 +222,6 @@ class ResearchService:
                     "executed_queries": branch_result["executed_queries"],
                     "learnings_count": len(branch_result["learnings"]),
                 })
-        
 
         synthesizer_service = SynthesizerService()
         report, synth_context = synthesizer_service.synthesize_plan_results(
@@ -252,27 +256,32 @@ class ResearchService:
         research_analysis_service: Any,
         embedding_service: Any,
     ) -> ResearchBranchResult:
-        """Ejecutar una rama de investigación."""
-     
         search_result = await web_search_service.search_branch(
             branch=branch,
             query=query,
             target_technology=target_technology,
         )
+
+        research_brief = f"Investigating {target_technology} in context: {query}"
         
-        learnings, reviewed_urls = research_analysis_service.analyze(
-            branch_id=branch["branch_id"],
-            provider=branch["provider"],
-            raw_text=search_result["raw_text"],
-            source_urls=search_result["source_urls"],
+        result = await research_analysis_service.analyze(
+            branch=branch,
+            query=query,
+            target_technology=target_technology,
+            research_brief=research_brief,
+            search_output=search_result,
+            accumulated_learnings=[],
         )
-        
-        # 3. Embeddings
-        embeddings = embedding_service.embed_and_relate(
-            texts=learnings,
+        learnings = result.get("learnings", [])
+        reviewed_urls = result.get("source_urls", [])
+
+        embedding_artifact = embedding_service.embed_iteration(
             branch_id=branch["branch_id"],
             iteration=1,
             query=query,
+            target_technology=target_technology,
+            learnings=learnings,
+            previous_embeddings=[],
         )
         
         return ResearchBranchResult(
@@ -285,7 +294,7 @@ class ResearchService:
             learnings=learnings,
             source_urls=reviewed_urls,
             iterations=1,
-            embeddings=embeddings,
+            embeddings=[embedding_artifact],
         )
 
     def _get_adapter(self) -> GeminiAdapter:

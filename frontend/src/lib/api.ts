@@ -1,5 +1,6 @@
 import type {
   AnalysisStreamEvent,
+  ChatStreamEvent,
   DocumentAnalyzeRequest,
   DocumentAnalyzeResponse,
   DocumentMentionsResponse,
@@ -107,6 +108,18 @@ export function createChatStreamUrl(query: string, idempotencyKey?: string | nul
     url.searchParams.set("idempotency_key", idempotencyKey);
   }
   return url.toString();
+}
+
+export function streamChatResearch(
+  query: string,
+  idempotencyKey: string,
+  onEvent: (event: ChatStreamEvent) => void,
+) {
+  const source = new EventSource(createChatStreamUrl(query, idempotencyKey));
+  source.onmessage = (event) => {
+    onEvent(JSON.parse(event.data) as ChatStreamEvent);
+  };
+  return source;
 }
 
 export async function readReportMarkdown(documentId: string): Promise<string> {

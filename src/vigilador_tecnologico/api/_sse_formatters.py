@@ -9,20 +9,22 @@ from vigilador_tecnologico.storage.service import StorageService
 
 def research_event_payload(event: dict[str, Any], *, sequence: int, request: ResearchRequest) -> dict[str, Any]:
     """Format event for research/stream endpoint."""
-    event_type = "AnalysisFailed" if event.get("operation_status") == "failed" else (event.get("message") or "ResearchEvent")
     details = event.get("details") or {}
     stage_context: dict[str, Any] = {}
     if isinstance(details, dict):
         raw_stage_context = details.get("stage_context")
         if isinstance(raw_stage_context, dict):
             stage_context = raw_stage_context
-    
+
+    event_type = event.get("message") or "ResearchEvent"
+    operation_status = event.get("operation_status") or event.get("status") or "running"
+
     payload: dict[str, Any] = {
         "event_id": event["event_id"],
         "sequence": sequence,
         "operation_id": event["operation_id"],
         "operation_type": event["operation_type"],
-        "operation_status": event["operation_status"],
+        "operation_status": operation_status,
         "event_type": event_type,
         "message": event.get("message") or "",
         "document_id": request["document_id"],
@@ -31,7 +33,7 @@ def research_event_payload(event: dict[str, Any], *, sequence: int, request: Res
     }
     if stage_context:
         payload["stage_context"] = stage_context
-    if event_type == "ResearchCompleted" and isinstance(details, dict) and "report" in details:
+    if event_type == "ReportGenerated" and isinstance(details, dict) and "report" in details:
         payload["report"] = details["report"]
     return payload
 

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { DocumentIngest } from "@/components/DocumentIngest";
 import { KnowledgeGraph } from "@/components/KnowledgeGraph";
 import { ChatMessages } from "@/components/ChatMessages";
+import { ResearchChat } from "@/components/ResearchChat";
 import type { ChatMessage } from "@/components/ChatMessages";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiBaseUrl, normalizeDetails, startAnalysis } from "@/lib/api";
@@ -209,6 +210,7 @@ export function DashboardWorkspace() {
           </div>
           <TabsList className="bg-slate-100">
             <TabsTrigger value="chat" className="gap-2"><MessageSquare className="size-4" />Chat de Analisis</TabsTrigger>
+            <TabsTrigger value="research" className="gap-2"><Sparkles className="size-4" />Research</TabsTrigger>
             <TabsTrigger value="graph" className="gap-2"><Network className="size-4" />Grafo de Conocimiento</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
@@ -313,6 +315,12 @@ export function DashboardWorkspace() {
         <TabsContent value="graph" className="flex-1 mt-0 overflow-hidden flex">
           <div className="flex flex-1 h-full bg-slate-50">
             <KnowledgeGraph documentId={currentDocument?.document_id ?? null} mentions={mentions} report={report} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="research" className="flex-1 mt-0 overflow-hidden flex">
+          <div className="flex flex-1 overflow-hidden">
+            <ResearchChat />
           </div>
         </TabsContent>
       </Tabs>

@@ -19,12 +19,32 @@ from vigilador_tecnologico.api._sse_formatters import chat_event_payload, resear
 from vigilador_tecnologico.contracts.models import ResearchRequest
 from vigilador_tecnologico.services._stage_context import build_stage_context
 from vigilador_tecnologico.services.prompt_engineering import prompt_engineering_service
+from vigilador_tecnologico.services.research import ResearchService
 from vigilador_tecnologico.storage.operations import operation_journal
 
 router = APIRouter()
 
+research_service = ResearchService()
+
 RESEARCH_TERMINAL_STATUSES = {"completed", "failed"}
 RESEARCH_POLL_INTERVAL_SECONDS = 0.1
+
+
+async def _execute_research_operation(
+    request: ResearchRequest,
+    operation_id: str,
+    custom_query: str | None = None,
+    research_service: ResearchService | None = None,
+) -> None:
+    """Wrapper para ejecutar investigación con service inyectado."""
+    await execute_research_operation(
+        request=request,
+        operation_id=operation_id,
+        journal=operation_journal,
+        poll_interval_seconds=RESEARCH_POLL_INTERVAL_SECONDS,
+        custom_query=custom_query,
+        research_service=research_service,
+    )
 
 
 def _slugify(value: str) -> str:
@@ -119,16 +139,6 @@ def _chat_event_payload(
     )
 
 
-async def _execute_research_operation(request: ResearchRequest, operation_id: str, custom_query: str | None = None) -> None:
-    await execute_research_operation(
-        request,
-        operation_id,
-        operation_journal,
-        custom_query=custom_query,
-        poll_interval_seconds=RESEARCH_POLL_INTERVAL_SECONDS,
-    )
-
-
 async def research_event_stream(
     request: ResearchRequest,
     *,
@@ -147,7 +157,7 @@ async def research_event_stream(
             _mark_research_requested(operation_id, request)
     live_task: asyncio.Task[Any] | None = None
     if not reused:
-        live_task = asyncio.create_task(_execute_research_operation(request, operation_id, custom_query))
+        live_task = asyncio.create_task(_execute_research_operation(request, operation_id, custom_query, research_service))
     emitted_event_ids: set[str] = set()
     sequence = max(0, sequence_start - 1)
     try:

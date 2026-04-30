@@ -157,4 +157,3 @@ class StorageService:
         self.graph = KnowledgeGraphRepository(root / "graph")
         self.reports = ReportRepository(root / "reports")
         self.embeddings = EmbeddingRepository(root / "embeddings")
-        # audit eliminated - use Python standard logging instead

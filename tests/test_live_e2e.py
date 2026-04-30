@@ -5,7 +5,6 @@ from urllib.error import URLError
 
 from vigilador_tecnologico.api.sse_routes import _build_research_request, research_event_stream
 from vigilador_tecnologico.integrations import GeminiAdapter, GeminiAdapterError, get_gemini_key, get_mistral_key
-from vigilador_tecnologico.pipeline import nodes as nodes_module
 from vigilador_tecnologico.services.normalization import NormalizationService
 
 
@@ -41,9 +40,6 @@ class LiveEndToEndSmokeTest(unittest.IsolatedAsyncioTestCase):
 			raise last_error
 
 	async def test_primary_stack_and_stream_complete(self):
-		self.assertEqual(nodes_module.thinker_model.model, "gemma-4-31b-it")
-		self.assertEqual(nodes_module.reporter_model.model, "gemma-4-26b-a4b-it")
-
 		gemini = GeminiAdapter(model="gemini-3.1-flash-lite-preview")
 		async def generate_content():
 			return await asyncio.to_thread(
@@ -102,27 +98,17 @@ class LiveEndToEndSmokeTest(unittest.IsolatedAsyncioTestCase):
 					chunk = chunk.decode("utf-8")
 				payload = json.loads(chunk.removeprefix("data: ").strip())
 				events.append(payload)
-				if "report_markdown" in payload:
+				if "report" in payload:
 					break
 			return events
 
 		events = await self._run_with_retry(collect_events)
 
-		self.assertEqual(len(events), 6)
-		self.assertEqual(
-			[payload["event_type"] for payload in events],
-			[
-				"ResearchRequested",
-				"ResearchNodeEvaluated",
-				"ResearchNodeEvaluated",
-				"ResearchNodeEvaluated",
-				"ResearchNodeEvaluated",
-				"ResearchCompleted",
-			],
-		)
-		self.assertEqual(events[-1]["nodo"], "reporte_node")
-		self.assertIn("report_markdown", events[-1])
-		self.assertGreater(len(events[-1]["report_markdown"]), 500)
+		self.assertGreater(len(events), 0)
+		self.assertEqual(events[0]["event_type"], "ResearchRequested")
+		self.assertEqual(events[-1]["event_type"], "ResearchCompleted")
+		self.assertIn("report", events[-1])
+		self.assertGreater(len(events[-1]["report"]), 500)
 		self.assertIn("event_id", events[-1])
 		self.assertIn("idempotency_key", events[-1])
 		self.assertEqual(events[-1]["sequence"], len(events))

@@ -7,7 +7,7 @@ from vigilador_tecnologico.services._stage_context import build_stage_context
 from vigilador_tecnologico.storage.operations import OperationJournal
 
 
-RESEARCH_PROGRESS_EVENT_TYPES = {"ResearchRequested", "ResearchPlanCreated", "ResearchNodeEvaluated", "ResearchCompleted"}
+RESEARCH_PROGRESS_EVENT_TYPES = {"ResearchRequested", "ResearchPlanCreated", "ResearchNodeEvaluated", "ReportGenerated", "ResearchCompleted"}
 
 
 def research_requested_details(request: ResearchRequest) -> dict[str, Any]:
@@ -67,19 +67,28 @@ async def execute_research_operation(
     journal: OperationJournal,
     poll_interval_seconds: float = 0.1,
     custom_query: str | None = None,
+    research_service: Any = None,
 ) -> None:
     """
     Ejecutar operación de investigación sin LangGraph.
-    
+
     Flujo:
     1. ResearchService.execute_full_research()
     2. Registrar eventos en journal para SSE streaming
     3. Marcar operación completada/fallida
+    
+    Args:
+        request: ResearchRequest con query, breadth, depth
+        operation_id: ID de operación para journal
+        journal: OperationJournal para persistir eventos
+        poll_interval_seconds: Intervalo de polling (no usado en ejecución directa)
+        custom_query: Query refinado (opcional)
+        research_service: ResearchService inyectado (opcional, crea uno si None)
     """
-    from vigilador_tecnologico.services.research import ResearchService
-    
-    research_service = ResearchService()
-    
+    if research_service is None:
+        from vigilador_tecnologico.services.research import ResearchService
+        research_service = ResearchService()
+
     def progress_callback(stage: str, context: dict[str, Any]) -> None:
         """Callback para registrar progreso en journal."""
         journal.mark_running(
@@ -88,7 +97,7 @@ async def execute_research_operation(
             details={"stage_context": context},
             event_key=stage.lower().replace("_", "-"),
         )
-    
+
     completed = False
     try:
         result = await research_service.execute_full_research(
@@ -98,7 +107,7 @@ async def execute_research_operation(
             depth=request["depth"],
             progress_callback=progress_callback,
         )
-        
+
         journal.mark_running(
             operation_id,
             message="ReportGenerated",
@@ -108,7 +117,7 @@ async def execute_research_operation(
             },
             event_key="report-generated",
         )
-        
+
 
         journal.mark_completed(
             operation_id,
@@ -121,16 +130,16 @@ async def execute_research_operation(
             event_key="research-completed",
         )
         completed = True
-        
+
     except Exception as error:
-    
+        error_text = str(error)
         error_details: dict[str, Any] = {
-            "error": str(error),
+            "error": error_text[:500] + "..." if len(error_text) > 500 else error_text,
             "error_type": type(error).__name__,
         }
         journal.mark_failed(
             operation_id,
-            str(error),
+            error_text[:200] + "..." if len(error_text) > 200 else error_text,
             details=error_details,
             event_key=f"research-failed:{type(error).__name__}",
         )

@@ -113,7 +113,8 @@ def parse_json_response(
     except JSONDecodeError:
         parsed = _extract_first_json_object(payload_text) or _extract_first_json_object(text)
         if parsed is None:
-            raise ResponsePayloadError(f"{invalid_json_error}: {text}")
+            truncated_text = text[:500] + "..." if len(text) > 500 else text
+            raise ResponsePayloadError(f"{invalid_json_error}: {truncated_text}")
 
     if isinstance(parsed, dict) or isinstance(parsed, list):
         return parsed

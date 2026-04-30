@@ -121,7 +121,7 @@ async def upload_document(payload: DocumentUploadRequest) -> DocumentUploadRespo
     try:
         stored_document = document_storage.save(payload.filename, payload.content, payload.source_type)
         document_storage.save_status(stored_document.document_id, "UPLOADED")
-        _storage_service().audit.append("DocumentUploaded", stored_document.document_id, {"filename": stored_document.filename})
+        logger.info("DocumentUploaded", extra={"document_id": stored_document.document_id, "uploaded_filename": stored_document.filename})
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     try:
@@ -163,7 +163,7 @@ async def extract_document(document_id: str) -> DocumentExtractionResponse:
         )
         _storage_service().mentions.save_extracted(stored_document.document_id, [dict(mention) for mention in mentions])
         document_storage.save_status(stored_document.document_id, "EXTRACTED")
-        _storage_service().audit.append("TechnologiesExtracted", stored_document.document_id, {"mention_count": len(mentions)})
+        logger.info("TechnologiesExtracted", extra={"document_id": stored_document.document_id, "mention_count": len(mentions)})
     except Exception as error:
         document_storage.save_status(stored_document.document_id, "PARSED", error=str(error))
         raise HTTPException(status_code=502, detail=str(error)) from error
@@ -225,7 +225,9 @@ def _load_or_parse(stored_document: StoredDocument) -> ParsedDocumentRecord:
 
 
 def _parse_and_persist(stored_document: StoredDocument) -> ParsedDocumentRecord:
+    logger.info("Starting document ingest", extra={"document_id": stored_document.document_id, "source_type": stored_document.source_type, "source_uri": stored_document.source_uri})
     ingest_result = document_ingest_worker.ingest(stored_document.source_uri, stored_document.source_type, stored_document.document_id)
+    logger.info("DocumentParsed", extra={"document_id": stored_document.document_id, "page_count": ingest_result.page_count, "ingestion_engine": ingest_result.ingestion_engine, "raw_text_length": len(ingest_result.raw_text)})
     parsed_document = document_storage.save_parsed_result(
         stored_document.document_id,
         source_type=stored_document.source_type,
@@ -238,16 +240,6 @@ def _parse_and_persist(stored_document: StoredDocument) -> ParsedDocumentRecord:
         fallback_reason=ingest_result.fallback_reason,
     )
     document_storage.save_status(stored_document.document_id, "PARSED")
-    _storage_service().audit.append(
-        "DocumentParsed",
-        stored_document.document_id,
-        {
-            "page_count": parsed_document.page_count,
-            "ingestion_engine": parsed_document.ingestion_engine,
-            "model": parsed_document.model,
-            "fallback_reason": parsed_document.fallback_reason,
-        },
-    )
     return parsed_document
 
 
