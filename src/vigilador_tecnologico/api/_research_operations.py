@@ -99,7 +99,6 @@ async def execute_research_operation(
             progress_callback=progress_callback,
         )
         
-        # Registrar final report en journal
         journal.mark_running(
             operation_id,
             message="ReportGenerated",
