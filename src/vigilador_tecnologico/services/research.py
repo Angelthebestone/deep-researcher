@@ -7,7 +7,14 @@ from time import sleep
 import re
 from typing import Any, Callable, cast
 
-from vigilador_tecnologico.contracts.models import AlternativeTechnology, ResearchStatus, TechnologyResearch
+from vigilador_tecnologico.contracts.models import (
+    AlternativeTechnology,
+    ResearchPlan,
+    ResearchPlanBranch,
+    ResearchBranchResult,
+    ResearchStatus,
+    TechnologyResearch,
+)
 from vigilador_tecnologico.integrations import GeminiAdapter, MistralAdapter
 from vigilador_tecnologico.integrations.model_profiles import GEMINI_WEB_SEARCH_MODEL, WEB_SEARCH_TOOLS
 from vigilador_tecnologico.integrations.retry import call_with_retry
@@ -135,6 +142,151 @@ class ResearchService:
             if progress_callback is not None:
                 progress_callback(research, index, total)
         return results
+
+    async def execute_full_research(
+        self,
+        target_technology: str,
+        query: str,
+        breadth: int = 3,
+        depth: int = 1,
+        progress_callback: Callable[[str, dict], None] | None = None,
+    ) -> ResearchExecutionResult:
+        """
+        Ejecutar investigación completa sin LangGraph.
+        
+        Flujo:
+        1. PlanningService.create_research_plan
+        2. Para cada rama: WebSearchService + ResearchAnalysisService + EmbeddingService
+        3. SynthesizerService.synthesize_plan_results
+        
+        Args:
+            target_technology: Tecnología objetivo
+            query: Query de investigación (puede ser refinado por prompt engineering)
+            breadth: Máximo de queries únicas por ronda (default: 3)
+            depth: Profundidad máxima (default: 1)
+            progress_callback: Callback para progreso (stage_name, context_dict)
+        
+        Returns:
+            ResearchExecutionResult con plan, branch_results, report y stage_context
+        """
+        # Lazy imports para evitar dependencias circulares
+        from .planning import PlanningService
+        from .web_search import WebSearchService
+        from .research_analysis import ResearchAnalysisService
+        from .embedding import EmbeddingService
+        from .synthesizer import SynthesizerService
+        
+        started_at = perf_counter()
+        
+    
+        planning_service = PlanningService()
+        plan, plan_context = planning_service.create_research_plan(
+            target_technology=target_technology,
+            research_brief=query,
+            breadth=breadth,
+            depth=depth,
+        )
+        
+        if progress_callback:
+            progress_callback("ResearchPlanCreated", plan_context)
+        
+        # 2. Inicializar servicios de ejecución
+        web_search_service = WebSearchService()
+        research_analysis_service = ResearchAnalysisService()
+        embedding_service = EmbeddingService()
+        
+        # 3. Ejecución serial de ramas
+        branch_results: list[ResearchBranchResult] = []
+        for branch in plan["branches"]:
+            branch_result = await self._execute_branch(
+                branch=branch,
+                target_technology=target_technology,
+                query=query,
+                breadth=breadth,
+                depth=depth,
+                web_search_service=web_search_service,
+                research_analysis_service=research_analysis_service,
+                embedding_service=embedding_service,
+            )
+            branch_results.append(branch_result)
+            
+            if progress_callback:
+                progress_callback("ResearchNodeEvaluated", {
+                    "branch_id": branch_result["branch_id"],
+                    "provider": branch_result["provider"],
+                    "executed_queries": branch_result["executed_queries"],
+                    "learnings_count": len(branch_result["learnings"]),
+                })
+        
+
+        synthesizer_service = SynthesizerService()
+        report, synth_context = synthesizer_service.synthesize_plan_results(
+            target_technology=target_technology,
+            plan=plan,
+            branch_results=branch_results,
+        )
+        
+        final_context = build_stage_context(
+            "ResearchCompleted",
+            model=synth_context.get("model", synthesizer_service.model),
+            duration_ms=int((perf_counter() - started_at) * 1000),
+            breadth=breadth,
+            depth=depth,
+        )
+        
+        return ResearchExecutionResult(
+            plan=plan,
+            branch_results=branch_results,
+            report=report,
+            stage_context=final_context,
+        )
+    
+    async def _execute_branch(
+        self,
+        branch: ResearchPlanBranch,
+        target_technology: str,
+        query: str,
+        breadth: int,
+        depth: int,
+        web_search_service: Any,
+        research_analysis_service: Any,
+        embedding_service: Any,
+    ) -> ResearchBranchResult:
+        """Ejecutar una rama de investigación."""
+     
+        search_result = await web_search_service.search_branch(
+            branch=branch,
+            query=query,
+            target_technology=target_technology,
+        )
+        
+        learnings, reviewed_urls = research_analysis_service.analyze(
+            branch_id=branch["branch_id"],
+            provider=branch["provider"],
+            raw_text=search_result["raw_text"],
+            source_urls=search_result["source_urls"],
+        )
+        
+        # 3. Embeddings
+        embeddings = embedding_service.embed_and_relate(
+            texts=learnings,
+            branch_id=branch["branch_id"],
+            iteration=1,
+            query=query,
+        )
+        
+        return ResearchBranchResult(
+            branch_id=branch["branch_id"],
+            provider=branch["provider"],
+            objective=branch["objective"],
+            search_model=branch["search_model"],
+            review_model=branch["review_model"],
+            executed_queries=[query],
+            learnings=learnings,
+            source_urls=reviewed_urls,
+            iterations=1,
+            embeddings=embeddings,
+        )
 
     def _get_adapter(self) -> GeminiAdapter:
         if self.adapter is None:
@@ -370,6 +522,16 @@ class ResearchService:
         if match is None:
             return None
         return match.group(0)
+
+
+@dataclass(slots=True)
+class ResearchExecutionResult:
+    """Resultado de ejecución de investigación sin LangGraph."""
+    plan: ResearchPlan
+    branch_results: list[ResearchBranchResult]
+    report: str
+    stage_context: dict[str, Any]
+
 
 
 def research_technologies(technology_names: list[str]) -> list[TechnologyResearch]:

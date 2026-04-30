@@ -14,7 +14,6 @@ from pydantic import Base64Bytes, BaseModel, Field
 from vigilador_tecnologico.api._sse_formatters import analysis_stream_payload
 from vigilador_tecnologico.contracts.models import DocumentStatus, SourceType, TechnologyMention
 from vigilador_tecnologico.services.extraction import ExtractionService
-from vigilador_tecnologico.services.notification import NotificationService
 from vigilador_tecnologico.services.reporting import render_report_markdown
 from vigilador_tecnologico.storage.documents import DocumentStatusRecord, DocumentStorage, ParsedDocumentRecord, StoredDocument
 from vigilador_tecnologico.storage.operations import operation_journal
@@ -33,7 +32,6 @@ class AppDependencies:
     document_ingest_worker: DocumentIngestWorker = field(default_factory=DocumentIngestWorker)
     document_extraction_service: ExtractionService = field(default_factory=ExtractionService)
     document_pipeline_orchestrator: PipelineOrchestrator = field(default_factory=PipelineOrchestrator)
-    notification_service: NotificationService = field(default_factory=NotificationService)
     analysis_launch_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     analysis_launch_tasks: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
 
@@ -43,7 +41,6 @@ document_storage = dependencies.document_storage
 document_ingest_worker = dependencies.document_ingest_worker
 document_extraction_service = dependencies.document_extraction_service
 document_pipeline_orchestrator = dependencies.document_pipeline_orchestrator
-notification_service = dependencies.notification_service
 
 
 class DocumentUploadRequest(BaseModel):

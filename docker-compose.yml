@@ -10,8 +10,6 @@ services:
       - vigilador-data:/app/.vigilador_data
     environment:
       PYTHONUNBUFFERED: "1"
-    depends_on:
-      - broker
 
   dashboard-web:
     build:
@@ -26,44 +24,5 @@ services:
     depends_on:
       - api-gateway
 
-  document-ingest-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: vigilador-tecnologico:latest
-    command: ["python", "-c", "import time; time.sleep(3600)"]
-    volumes:
-      - vigilador-data:/app/.vigilador_data
-    environment:
-      WORKER_ROLE: document-ingest
-    depends_on:
-      - broker
-    profiles:
-      - workers
-
-  research-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: vigilador-tecnologico:latest
-    command: ["python", "-c", "import time; time.sleep(3600)"]
-    volumes:
-      - vigilador-data:/app/.vigilador_data
-    environment:
-      WORKER_ROLE: research
-    depends_on:
-      - broker
-    profiles:
-      - workers
-
-  broker:
-    image: rabbitmq:3-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-
 volumes:
   vigilador-data:
-  rabbitmq-data:

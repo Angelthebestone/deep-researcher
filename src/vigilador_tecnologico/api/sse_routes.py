@@ -17,13 +17,11 @@ from vigilador_tecnologico.api._research_operations import (
 )
 from vigilador_tecnologico.api._sse_formatters import chat_event_payload, research_event_payload
 from vigilador_tecnologico.contracts.models import ResearchRequest
-from vigilador_tecnologico.pipeline.graph_orchestrator import build_research_graph
 from vigilador_tecnologico.services._stage_context import build_stage_context
 from vigilador_tecnologico.services.prompt_engineering import prompt_engineering_service
 from vigilador_tecnologico.storage.operations import operation_journal
 
 router = APIRouter()
-graph_app = build_research_graph()
 
 RESEARCH_TERMINAL_STATUSES = {"completed", "failed"}
 RESEARCH_POLL_INTERVAL_SECONDS = 0.1
@@ -125,9 +123,8 @@ async def _execute_research_operation(request: ResearchRequest, operation_id: st
     await execute_research_operation(
         request,
         operation_id,
+        operation_journal,
         custom_query=custom_query,
-        graph_app=graph_app,
-        journal=operation_journal,
         poll_interval_seconds=RESEARCH_POLL_INTERVAL_SECONDS,
     )
 

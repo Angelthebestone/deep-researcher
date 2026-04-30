@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -148,38 +147,6 @@ class EmbeddingRepository:
         return payload if isinstance(payload, list) else []
 
 
-class AuditLogRepository:
-    def __init__(self, base_dir: Path) -> None:
-        self.base_dir = base_dir
-
-    def append(self, event_type: str, subject_id: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
-        event = {
-            "event_type": event_type,
-            "subject_id": subject_id,
-            "created_at": datetime.now(UTC),
-            "details": details or {},
-        }
-        self.base_dir.mkdir(parents=True, exist_ok=True)
-        path = self.base_dir / "audit.jsonl"
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(to_json(event), ensure_ascii=False))
-            handle.write("\n")
-        return event
-
-    def list_events(self, subject_id: str | None = None) -> list[dict[str, Any]]:
-        path = self.base_dir / "audit.jsonl"
-        if not path.exists():
-            return []
-        events: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            event = json.loads(line)
-            if subject_id is None or event.get("subject_id") == subject_id:
-                events.append(event)
-        return events
-
-
 class StorageService:
     def __init__(self, base_dir: Path | None = None) -> None:
         root = (base_dir or default_storage_root()).expanduser().resolve()
@@ -190,4 +157,4 @@ class StorageService:
         self.graph = KnowledgeGraphRepository(root / "graph")
         self.reports = ReportRepository(root / "reports")
         self.embeddings = EmbeddingRepository(root / "embeddings")
-        self.audit = AuditLogRepository(root / "audit")
+        # audit eliminated - use Python standard logging instead

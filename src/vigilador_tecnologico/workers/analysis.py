@@ -4,7 +4,6 @@ import logging
 from time import perf_counter
 from typing import Any, Callable
 
-from vigilador_tecnologico.services.notification import NotificationService
 from vigilador_tecnologico.storage.documents import DocumentStorage, StoredDocument
 from vigilador_tecnologico.storage.operations import OperationJournal
 from vigilador_tecnologico.storage.service import StorageService
@@ -22,7 +21,6 @@ def execute_analysis_operation(
     document_storage: DocumentStorage,
     operation_journal: OperationJournal,
     pipeline_orchestrator: PipelineOrchestrator,
-    notification_service: NotificationService,
     load_or_parse: Callable[[StoredDocument], Any],
     document_parse_model_hint: str,
 ) -> None:
@@ -77,15 +75,22 @@ def execute_analysis_operation(
             storage_service=storage_service,
             record_event=record_event,
         )
-        try:
-            notification_service.notify_critical_risks(
-                storage_service,
-                document_id=stored_document.document_id,
-                report_id=result.report_id,
-                risks=result.risks,
-            )
-        except Exception:
-            logger.exception("critical_risk_notification_failed", extra={"document_id": stored_document.document_id, "report_id": result.report_id})
+        
+
+        critical_risks = [risk for risk in result.risks if risk["severity"] in {"critical", "high"}]
+        if critical_risks:
+            for risk in critical_risks:
+                logger.warning(
+                    "CriticalRiskAlert",
+                    extra={
+                        "document_id": stored_document.document_id,
+                        "report_id": result.report_id,
+                        "technology_name": risk["technology_name"],
+                        "severity": risk["severity"],
+                        "description": risk["description"],
+                    },
+                )
+        
         operation_journal.mark_completed(
             operation_id,
             message="Document analysis completed",
@@ -102,28 +107,29 @@ def execute_analysis_operation(
         failure_details: dict[str, Any] = {"document_id": stored_document.document_id, "failed_stage": error.stage}
         if error.stage_context:
             failure_details["stage_context"] = error.stage_context
-        try:
-            notification_service.notify_operation_failure(
-                storage_service,
-                document_id=stored_document.document_id,
-                operation_id=operation_id,
-                error=str(error),
-                details=failure_details,
-            )
-        except Exception:
-            logger.exception("operation_failure_notification_failed", extra={"document_id": stored_document.document_id, "operation_id": operation_id})
+        
+        logger.error(
+            "OperationFailedAlert",
+            extra={
+                "document_id": stored_document.document_id,
+                "operation_id": operation_id,
+                "failed_stage": error.stage,
+                "error": str(error),
+            },
+            exc_info=True,
+        )
         operation_journal.mark_failed(operation_id, str(error), details=failure_details)
     except Exception as error:
         status_record = document_storage.load_status(stored_document.document_id)
         document_storage.save_status(stored_document.document_id, status_record.status, error=str(error))
-        try:
-            notification_service.notify_operation_failure(
-                storage_service,
-                document_id=stored_document.document_id,
-                operation_id=operation_id,
-                error=str(error),
-                details={"document_id": stored_document.document_id},
-            )
-        except Exception:
-            logger.exception("operation_failure_notification_failed", extra={"document_id": stored_document.document_id, "operation_id": operation_id})
+        
+        logger.error(
+            "OperationFailedAlert",
+            extra={
+                "document_id": stored_document.document_id,
+                "operation_id": operation_id,
+                "error": str(error),
+            },
+            exc_info=True,
+        )
         operation_journal.mark_failed(operation_id, str(error), details={"document_id": stored_document.document_id})

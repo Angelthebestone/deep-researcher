@@ -299,38 +299,12 @@ def _collect_operation_metrics(root: Path) -> dict[str, Any]:
 
 
 def _collect_alert_metrics(root: Path) -> dict[str, Any]:
-    audit_path = root / "audit" / "audit.jsonl"
-    if not audit_path.exists():
-        return {
-            "total": 0,
-            "event_type_counts": {},
-            "critical_alerts": 0,
-            "operational_alerts": 0,
-        }
-
-    event_type_counts: Counter[str] = Counter()
-    critical_alerts = 0
-    operational_alerts = 0
-
-    for line in audit_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            payload = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        event_type = str(payload.get("event_type") or "unknown")
-        event_type_counts[event_type] += 1
-        if event_type == "CriticalRiskAlert":
-            critical_alerts += 1
-        if event_type == "OperationFailedAlert":
-            operational_alerts += 1
-
     return {
-        "total": sum(event_type_counts.values()),
-        "event_type_counts": dict(event_type_counts),
-        "critical_alerts": critical_alerts,
-        "operational_alerts": operational_alerts,
+        "total": 0,
+        "event_type_counts": {},
+        "critical_alerts": 0,
+        "operational_alerts": 0,
+        "note": "Alert logging migrated to Python standard logging",
     }
 
 

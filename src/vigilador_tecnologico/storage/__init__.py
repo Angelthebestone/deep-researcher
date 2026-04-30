@@ -1,8 +1,7 @@
-"""Persistence layer for raw documents, vectors, graph data, and audit logs."""
+"""Persistence layer for raw documents, vectors, and graph data."""
 
 from .documents import DocumentStorage, DocumentStatusRecord, ParsedDocumentRecord, StoredDocument
 from .service import (
-    AuditLogRepository,
     EmbeddingRepository,
     KnowledgeGraphRepository,
     MentionRepository,
@@ -12,7 +11,6 @@ from .service import (
 )
 
 __all__ = [
-    "AuditLogRepository",
     "DocumentStatusRecord",
     "DocumentStorage",
     "EmbeddingRepository",
