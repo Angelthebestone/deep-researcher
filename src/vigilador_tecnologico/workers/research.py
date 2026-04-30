@@ -140,13 +140,7 @@ class ResearchWorker:
             "ResearchNodeEvaluated",
             model=model_for_context,
             fallback_reason=fallback_reason,
-            branch_id=branch["branch_id"],
-            branch_provider=branch["provider"],
-            target_technology=target_technology,
             depth=depth,
-            query_count=len(executed_queries),
-            embedding_count=len(aggregated_embeddings),
-            iteration=iteration_count or 1,
         )
         return ResearchBranchExecution(branch_result=branch_result, stage_context=stage_context)
 

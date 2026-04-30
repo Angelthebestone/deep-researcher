@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "technology_research.schema.json",
+  "title": "TechnologyResearch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["technology_name", "status", "summary", "checked_at"],
+  "properties": {
+    "technology_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["current", "deprecated", "emerging", "unknown"]
+    },
+    "breadth": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "depth": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "latest_version": {
+      "type": ["string", "null"]
+    },
+    "release_date": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AlternativeTechnology"
+      }
+    },
+    "source_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "visited_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "learnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fallback_history": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stage_context": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "stage": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "fallback_reason": {
+          "type": "string"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_stage": {
+          "type": "string"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "grounding_queries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "grounding_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "branch_id": {
+          "type": "string"
+        },
+        "branch_provider": {
+          "type": "string",
+          "enum": ["gemini_grounded", "mistral_web_search"]
+        },
+        "embedding_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checked_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "AlternativeTechnology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "reason", "status", "source_urls"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["current", "deprecated", "emerging", "unknown"]
+        },
+        "source_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

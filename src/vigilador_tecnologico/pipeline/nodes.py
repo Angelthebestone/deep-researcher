@@ -44,33 +44,15 @@ def _stage_value(stage_context: dict[str, Any], key: str) -> Any:
 def _enrich_stage_context(
     stage_context: dict[str, Any],
     state: ResearchState,
-    *,
-    current_depth: int,
-    iteration: int,
-    query_count: int | None = None,
-    branch: ResearchPlanBranch | None = None,
-    embedding_count: int | None = None,
 ) -> dict[str, Any]:
-    model = _stage_value(stage_context, "model")
-    branch_id = branch.get("branch_id") if branch else _stage_value(stage_context, "branch_id")
-    branch_provider = branch.get("provider") if branch else _stage_value(stage_context, "branch_provider")
+    """Enriquece stage_context con campos esenciales de research."""
     return build_stage_context(
         str(_stage_value(stage_context, "stage") or "research-node"),
-        model=str(model) if isinstance(model, str) and model.strip() else None,
+        model=_stage_value(stage_context, "model"),
         duration_ms=_stage_value(stage_context, "duration_ms"),
         fallback_reason=_stage_value(stage_context, "fallback_reason"),
-        node_name=_stage_value(stage_context, "node_name"),
         breadth=state.get("breadth", 3),
         depth=state.get("depth", 1),
-        current_depth=current_depth,
-        iteration=iteration,
-        document_id=state.get("document_id", ""),
-        target_technology=state.get("target_technology", ""),
-        query_count=query_count,
-        plan_id=_stage_value(stage_context, "plan_id"),
-        branch_id=branch_id,
-        branch_provider=branch_provider,
-        embedding_count=embedding_count,
     )
 
 
@@ -88,14 +70,7 @@ async def planificador_node(state: ResearchState) -> dict[str, Any]:
         "branch_cursor": 0,
         "queries_to_run": list(first_branch["queries"]),
         "iteration": 1,
-        "stage_context": _enrich_stage_context(
-            stage_context,
-            state,
-            current_depth=state.get("current_depth", 0),
-            iteration=1,
-            query_count=sum(len(branch["queries"]) for branch in plan["branches"]),
-            branch=first_branch,
-        ),
+        "stage_context": _enrich_stage_context(stage_context, state),
     }
 
 
@@ -117,15 +92,7 @@ async def extraccion_web_node(state: ResearchState) -> dict[str, Any]:
         "current_depth": state.get("current_depth", 0) + 1,
         "iteration": branch_result["iterations"] or 1,
         "executed_queries": list(branch_result["executed_queries"]),
-        "stage_context": _enrich_stage_context(
-            execution.stage_context,
-            state,
-            current_depth=state.get("current_depth", 0) + 1,
-            iteration=branch_result["iterations"] or 1,
-            query_count=len(branch_result["executed_queries"]),
-            branch=branch,
-            embedding_count=len(branch_result["embeddings"]),
-        ),
+        "stage_context": _enrich_stage_context(execution.stage_context, state),
     }
 
 
@@ -142,15 +109,8 @@ async def evaluador_profundidad_node(state: ResearchState) -> dict[str, Any]:
             "branch_cursor": next_branch_index,
             "queries_to_run": [],
             "stage_context": _enrich_stage_context(
-                build_stage_context(
-                    "ResearchBranchQueued",
-                    model="serial-coordinator",
-                    plan_id=research_plan["plan_id"],
-                ),
+                build_stage_context("ResearchBranchQueued", model="serial-coordinator"),
                 state,
-                current_depth=state.get("current_depth", 0),
-                iteration=1,
-                query_count=0,
             ),
         }
     next_branch = branches[next_branch_index]
@@ -159,18 +119,8 @@ async def evaluador_profundidad_node(state: ResearchState) -> dict[str, Any]:
         "queries_to_run": list(next_branch["queries"]),
         "iteration": 1,
         "stage_context": _enrich_stage_context(
-            build_stage_context(
-                "ResearchBranchQueued",
-                model="serial-coordinator",
-                plan_id=research_plan["plan_id"],
-                branch_id=next_branch["branch_id"],
-                branch_provider=next_branch["provider"],
-            ),
+            build_stage_context("ResearchBranchQueued", model="serial-coordinator"),
             state,
-            current_depth=state.get("current_depth", 0),
-            iteration=1,
-            query_count=len(next_branch["queries"]),
-            branch=next_branch,
         ),
     }
 

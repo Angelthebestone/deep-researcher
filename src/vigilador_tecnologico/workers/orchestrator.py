@@ -114,8 +114,6 @@ class PipelineOrchestrator:
         research_requested_context = build_stage_context(
             "ResearchRequested",
             model=getattr(self.research_service, "model", None) or "local",
-            technologies=technology_names,
-            technology_count=len(technology_names),
             breadth=self.document_research_breadth,
             depth=self.document_research_depth,
         )
@@ -150,7 +148,6 @@ class PipelineOrchestrator:
                     model=getattr(self.research_service, "model", None) or "local",
                     duration_ms=int((perf_counter() - research_started_at) * 1000),
                     failed_stage="ResearchNodeEvaluated",
-                    technology_count=len(technology_names),
                 ),
             ) from error
         research_duration_ms = int((perf_counter() - research_started_at) * 1000)
@@ -168,7 +165,6 @@ class PipelineOrchestrator:
                     "ResearchCompleted",
                     model=getattr(self.research_service, "model", None) or "local",
                     duration_ms=research_duration_ms,
-                    research_count=len(research_results),
                 ),
             },
             node_name="research-service",
@@ -198,7 +194,6 @@ class PipelineOrchestrator:
                     model="local",
                     duration_ms=int((perf_counter() - report_started_at) * 1000),
                     failed_stage="ReportGenerated",
-                    report_id=report_id,
                 ),
             ) from error
         report_duration_ms = int((perf_counter() - report_started_at) * 1000)
@@ -218,7 +213,6 @@ class PipelineOrchestrator:
                     model="local",
                     duration_ms=report_duration_ms,
                     failed_stage="ReportGenerated",
-                    report_id=report_id,
                 ),
             ) from error
         document_storage.save_status(stored_document.document_id, "REPORTED")
@@ -233,7 +227,6 @@ class PipelineOrchestrator:
                     "ReportGenerated",
                     model="local",
                     duration_ms=report_duration_ms,
-                    report_id=report_id,
                 ),
             },
             node_name="report-service",
@@ -425,7 +418,6 @@ class PipelineOrchestrator:
                 stage_context = dict(stage_context)
                 stage_context.setdefault("stage", "ResearchNodeEvaluated")
                 stage_context["model"] = getattr(self.research_service, "model", None) or stage_context.get("model") or "local"
-            stage_context.setdefault("node_name", "research-service")
             self._record(
                 storage_service,
                 record_event,

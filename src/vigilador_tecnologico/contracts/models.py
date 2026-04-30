@@ -62,25 +62,24 @@ class AlternativeTechnology(TypedDict):
 
 
 class StageContext(TypedDict):
+    """Contexto de etapa para trazabilidad SSE y audit log.
+    
+    Campos esenciales (6 en total):
+    - stage: Nombre de la etapa (requerido)
+    - model: Modelo usado (opcional)
+    - fallback_reason: Razón de fallback (opcional)
+    - duration_ms: Duración en milisegundos (opcional)
+    - failed_stage: Etapa que falló (opcional, para AnalysisFailed)
+    - breadth: Amplitud de research (opcional, solo research)
+    - depth: Profundidad de research (opcional, solo research)
+    """
     stage: str
-    model: str
+    model: NotRequired[str]
     fallback_reason: NotRequired[FallbackReason]
     duration_ms: NotRequired[int]
     failed_stage: NotRequired[str]
-    node_name: NotRequired[str]
-    grounding_queries: NotRequired[list[str]]
-    grounding_urls: NotRequired[list[str]]
     breadth: NotRequired[int]
     depth: NotRequired[int]
-    current_depth: NotRequired[int]
-    iteration: NotRequired[int]
-    query_count: NotRequired[int]
-    document_id: NotRequired[str]
-    target_technology: NotRequired[str]
-    plan_id: NotRequired[str]
-    branch_id: NotRequired[str]
-    branch_provider: NotRequired[ResearchBranchProvider]
-    embedding_count: NotRequired[int]
 
 
 class ResearchRequest(TypedDict):
@@ -268,20 +267,21 @@ class OperationRecord(TypedDict):
 
 
 class AnalysisStreamEvent(TypedDict):
+    """Evento de progreso SSE para streaming en vivo al dashboard.
+    
+    Campos esenciales (12 en total):
+    - 10 campos requeridos para identificación y estado
+    - 2 campos opcionales (stage_context, report)
+    """
     event_id: str
     sequence: int
     operation_id: str
     operation_type: OperationType
     operation_status: OperationStatus
     event_type: str
-    status: str
     message: str
-    nodo: str
     document_id: str
     idempotency_key: str
     details: dict[str, Any]
     stage_context: NotRequired[StageContext]
-    failed_stage: NotRequired[str]
-    technology: NotRequired[str]
-    report_markdown: NotRequired[str]
-    report_artifact: NotRequired[TechnologyReport]
+    report: NotRequired[TechnologyReport | str]

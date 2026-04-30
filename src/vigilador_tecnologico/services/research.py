@@ -129,8 +129,6 @@ class ResearchService:
                     model=model_used,
                     fallback_reason=fallback_reason,
                     duration_ms=int((perf_counter() - started_at) * 1000),
-                    grounding_queries=self._extract_grounding_queries(response),
-                    grounding_urls=self._extract_grounding_urls(response),
                 ),
             )
             results.append(research)

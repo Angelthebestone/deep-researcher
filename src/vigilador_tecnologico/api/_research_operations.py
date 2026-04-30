@@ -50,8 +50,6 @@ def research_requested_details(request: ResearchRequest) -> dict[str, Any]:
             model="serial-coordinator",
             breadth=request["breadth"],
             depth=request["depth"],
-            document_id=request["document_id"],
-            target_technology=request["target_technology"],
         ),
     }
 
@@ -207,8 +205,6 @@ async def execute_research_operation(
                 failed_stage="ResearchExecution",
                 breadth=request["breadth"],
                 depth=request["depth"],
-                document_id=request["document_id"],
-                target_technology=request["target_technology"],
             ),
         }
         event_key = "research-timeout" if is_timeout else f"research-failed:{type(error).__name__}"

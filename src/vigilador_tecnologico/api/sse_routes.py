@@ -201,8 +201,6 @@ async def stream_chat_research(query: str, idempotency_key: str | None = None):
             model=prompt_engineering_service.model,
             breadth=request["breadth"],
             depth=request["depth"],
-            document_id=request["document_id"],
-            target_technology=request["target_technology"],
         )
         operation = operation_journal.mark_running(
             str(operation["operation_id"]),
@@ -238,8 +236,6 @@ async def stream_chat_research(query: str, idempotency_key: str | None = None):
                 fallback_reason=improvement.get("fallback_reason"),
                 breadth=request["breadth"],
                 depth=request["depth"],
-                document_id=request["document_id"],
-                target_technology=request["target_technology"],
             )
             operation = operation_journal.mark_running(
                 str(operation["operation_id"]),
@@ -288,8 +284,6 @@ async def stream_chat_research(query: str, idempotency_key: str | None = None):
                 failed_stage="PromptImproved",
                 breadth=request["breadth"],
                 depth=request["depth"],
-                document_id=request["document_id"],
-                target_technology=request["target_technology"],
             )
             operation_journal.mark_failed(
                 str(operation["operation_id"]),
@@ -304,15 +298,11 @@ async def stream_chat_research(query: str, idempotency_key: str | None = None):
                 "operation_type": "research",
                 "operation_status": "failed",
                 "event_type": "AnalysisFailed",
-                "status": "AnalysisFailed",
                 "message": str(error),
-                "nodo": "prompt-engineering",
                 "document_id": request["document_id"],
-                "technology": request["target_technology"],
                 "idempotency_key": request["idempotency_key"],
-                "failed_stage": "PromptImproved",
                 "stage_context": failed_context,
-                "details": {"error": str(error), "stage_context": failed_context},
+                "details": {"error": str(error)},
             }
             yield f"data: {json.dumps(failure_payload, ensure_ascii=False)}\n\n"
 

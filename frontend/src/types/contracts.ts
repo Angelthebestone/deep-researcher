@@ -18,25 +18,13 @@ export type ImpactLevel = "low" | "medium" | "high";
 export type SeverityLevel = "low" | "medium" | "high" | "critical";
 
 export interface StageContext {
-  stage?: string;
+  stage: string;
   model?: string;
   fallback_reason?: string | null;
   duration_ms?: number | null;
   failed_stage?: string | null;
-  node_name?: string | null;
-  grounding_queries?: string[];
-  grounding_urls?: string[];
   breadth?: number;
   depth?: number;
-  current_depth?: number;
-  iteration?: number;
-  query_count?: number;
-  document_id?: string;
-  target_technology?: string;
-  plan_id?: string;
-  branch_id?: string;
-  branch_provider?: ResearchBranchProvider;
-  embedding_count?: number;
 }
 
 export interface EvidenceSpan {
@@ -318,17 +306,12 @@ export interface AnalysisStreamEvent {
   operation_type: OperationType;
   operation_status: OperationStatus;
   event_type: string;
-  status: string;
   message: string;
-  nodo: string;
   document_id: string;
   idempotency_key: string;
   details: Record<string, unknown>;
   stage_context?: StageContext;
-  failed_stage?: string;
-  technology?: string;
-  report_markdown?: string;
-  report_artifact?: TechnologyReport;
+  report?: TechnologyReport | string;
 }
 
 export interface DashboardSnapshot {

@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "technology_report.schema.json",
+  "title": "TechnologyReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_id",
+    "generated_at",
+    "document_scope",
+    "executive_summary",
+    "technology_inventory",
+    "comparisons",
+    "risks",
+    "recommendations",
+    "sources"
+  ],
+  "properties": {
+    "report_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "document_scope": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DocumentScopeItem"
+      }
+    },
+    "executive_summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "technology_inventory": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/InventoryItem"
+      }
+    },
+    "comparisons": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ComparisonItem"
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RiskItem"
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RecommendationItem"
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SourceItem"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "DocumentScopeItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "source_uri"],
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_uri": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "uploaded_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      }
+    },
+    "InventoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["technology_name", "normalized_name", "category", "status", "mention_count"],
+      "properties": {
+        "technology_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normalized_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "enum": ["language", "framework", "database", "cloud", "tool", "other"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["current", "deprecated", "emerging", "unknown"]
+        },
+        "mention_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "vendor": {
+          "type": "string"
+        },
+        "current_version": {
+          "type": ["string", "null"]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ComparisonItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["technology_name", "normalized_name", "market_status"],
+      "properties": {
+        "technology_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normalized_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_version": {
+          "type": ["string", "null"]
+        },
+        "latest_version": {
+          "type": ["string", "null"]
+        },
+        "version_gap": {
+          "type": "string"
+        },
+        "market_status": {
+          "type": "string",
+          "enum": ["current", "deprecated", "emerging", "unknown"]
+        },
+        "recommendation_summary": {
+          "type": "string"
+        },
+        "source_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AlternativeTechnology"
+          }
+        }
+      }
+    },
+    "AlternativeTechnology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "reason", "status", "source_urls"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["current", "deprecated", "emerging", "unknown"]
+        },
+        "source_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "RiskItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["technology_name", "severity", "description"],
+      "properties": {
+        "technology_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "RecommendationItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["technology_name", "priority", "action", "rationale", "effort", "impact"],
+      "properties": {
+        "technology_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"]
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effort": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "impact": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "source_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "SourceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "url", "retrieved_at"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string"
+        },
+        "source_type": {
+          "type": "string"
+        },
+        "retrieved_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

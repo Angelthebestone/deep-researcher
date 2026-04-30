@@ -51,10 +51,6 @@ class SynthesizerService:
             "ResearchCompleted",
             model=self.model,
             duration_ms=int((perf_counter() - started_at) * 1000),
-            plan_id=plan["plan_id"],
-            query_count=sum(len(branch["queries"]) for branch in plan["branches"]),
-            embedding_count=sum(len(branch.get("embeddings", [])) for branch in branch_results),
-            target_technology=target_technology,
         )
 
     def synthesize_learnings(self, target_technology: str, learnings: list[str]) -> tuple[str, dict[str, Any]]:

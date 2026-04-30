@@ -87,11 +87,8 @@ class PlanningService:
             "ResearchPlanCreated",
             model=self.model,
             duration_ms=int((perf_counter() - started_at) * 1000),
-            plan_id=plan["plan_id"],
             breadth=plan["breadth"],
             depth=plan["depth"],
-            query_count=sum(len(branch["queries"]) for branch in plan["branches"]),
-            target_technology=target_technology,
             fallback_reason=fallback_reason,
         )
 

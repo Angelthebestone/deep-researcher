@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analysis_stream_event.schema.json",
+  "title": "AnalysisStreamEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "sequence",
+    "operation_id",
+    "operation_type",
+    "operation_status",
+    "event_type",
+    "status",
+    "message",
+    "nodo",
+    "document_id",
+    "idempotency_key",
+    "details"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "operation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation_type": {
+      "type": "string",
+      "enum": ["research", "analysis"]
+    },
+    "operation_status": {
+      "type": "string",
+      "enum": ["queued", "running", "completed", "failed"]
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "message": {
+      "type": "string"
+    },
+    "nodo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "document_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "stage_context": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["stage", "model"],
+      "properties": {
+        "stage": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "fallback_reason": {
+          "type": "string",
+          "enum": [
+            "timeout",
+            "invalid_json",
+            "empty_response",
+            "provider_failure",
+            "grounded_postprocess",
+            "planner_fallback",
+            "gemini_timeout_to_mistral",
+            "empty_local_fallback",
+            "invalid_local_fallback"
+          ]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_stage": {
+          "type": "string"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "grounding_queries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "grounding_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "breadth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "current_depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "query_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "target_technology": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "branch_id": {
+          "type": "string"
+        },
+        "branch_provider": {
+          "type": "string",
+          "enum": ["gemini_grounded", "mistral_web_search"]
+        },
+        "embedding_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "failed_stage": {
+      "type": "string"
+    },
+    "technology": {
+      "type": "string"
+    },
+    "report_markdown": {
+      "type": "string"
+    },
+    "report_artifact": {
+      "$ref": "technology_report.schema.json"
+    }
+  }
+}

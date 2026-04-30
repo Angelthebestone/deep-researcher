@@ -108,15 +108,14 @@ function terminalStreamState(event: AnalysisStreamEvent, stageMessage: string, p
 }
 
 function getStageContext(event: AnalysisStreamEvent): StageContext {
-  const details = normalizeDetails(event.details);
   if (event.stage_context && typeof event.stage_context === "object") {
-    return event.stage_context;
+    return event.stage_context as StageContext;
   }
-  const nested = details.stage_context;
-  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
-    return nested as StageContext;
+  const details = normalizeDetails(event.details);
+  if (details.stage_context && typeof details.stage_context === "object") {
+    return details.stage_context as StageContext;
   }
-  return {};
+  return { stage: event.event_type };
 }
 
 function getStageModel(event: AnalysisStreamEvent): string | null {
@@ -136,13 +135,7 @@ function getStageModel(event: AnalysisStreamEvent): string | null {
 
 function getFailedStage(event: AnalysisStreamEvent): string | null {
   const stageContext = getStageContext(event);
-  if (typeof event.failed_stage === "string" && event.failed_stage.trim()) {
-    return event.failed_stage;
-  }
-  if (typeof stageContext.failed_stage === "string" && stageContext.failed_stage.trim()) {
-    return stageContext.failed_stage;
-  }
-  return null;
+  return stageContext.failed_stage ?? null;
 }
 
 function getStreamLabel(event: AnalysisStreamEvent): string {
@@ -188,15 +181,11 @@ function extractStageLabel(event: AnalysisStreamEvent) {
     const branchId =
       typeof branchResult?.branch_id === "string"
         ? branchResult.branch_id
-        : typeof stageContext.branch_id === "string"
-          ? stageContext.branch_id
-          : "rama";
+        : "rama";
     const iterations =
       typeof branchResult?.iterations === "number"
         ? branchResult.iterations
-        : typeof stageContext.iteration === "number"
-          ? stageContext.iteration
-          : "?";
+        : "?";
     return `${stageContext.stage ?? event.event_type} | ${branchId} | Breadth ${breadth || "?"} / Depth ${depth || "?"} | Iteraciones ${iterations}${
       model ? ` | ${model}` : ""
     }`;
@@ -550,7 +539,9 @@ export function AnalysisStream({
           </div>
           <div className="rounded-[1.5rem] border border-border bg-background/80 p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Ultimo nodo</div>
-            <div className="mt-1 text-sm font-medium">{latestEvent?.nodo ?? "n/a"}</div>
+            <div className="mt-1 text-sm font-medium">
+              {typeof latestEvent?.stage_context?.model === "string" ? latestEvent.stage_context.model : "n/a"}
+            </div>
           </div>
           <div className="rounded-[1.5rem] border border-border bg-background/80 p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Ultimo tipo</div>
@@ -595,7 +586,7 @@ export function AnalysisStream({
                   <Badge variant={stageTone(event.event_type) === "success" ? "success" : "secondary"}>#{event.sequence}</Badge>
                 </div>
                 <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
-                  <div>Node: {event.nodo}</div>
+                  <div>Node: {typeof event.details?.node_name === "string" ? event.details.node_name : "n/a"}</div>
                   {Object.keys(event.details || {}).length ? (
                     <pre className="overflow-auto rounded-[1.25rem] bg-muted/40 p-3 text-xs text-foreground">
                       {JSON.stringify(event.details, null, 2)}
