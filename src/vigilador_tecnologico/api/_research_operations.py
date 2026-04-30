@@ -91,7 +91,6 @@ async def execute_research_operation(
     
     completed = False
     try:
-        # Ejecutar investigación completa
         result = await research_service.execute_full_research(
             target_technology=request["target_technology"],
             query=custom_query or request["query"],
