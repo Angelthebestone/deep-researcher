@@ -218,10 +218,10 @@ class SSEStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
             ["ResearchRequested", "ResearchPlanCreated", "ResearchNodeEvaluated", "ReportGenerated", "ResearchCompleted"],
         )
         self.assertEqual([payload["sequence"] for payload in payloads], [1, 2, 3, 4, 5])
-        self.assertEqual(payloads[1]["stage_context"]["model"], "gemma-4-31b-it")
-        self.assertEqual(payloads[2]["stage_context"]["model"], "gemma-4-26b-it")
-        self.assertEqual(payloads[-2]["stage_context"]["stage"], "ResearchCompleted")
-        self.assertEqual(payloads[-2]["stage_context"]["model"], "gemini-3-flash-preview")
+        self.assertEqual(payloads[1]["details"]["model"], "gemma-4-31b-it")
+        self.assertEqual(payloads[2]["details"]["model"], "gemma-4-26b-it")
+        self.assertEqual(payloads[-1]["details"]["stage"], "ResearchCompleted")
+        self.assertEqual(payloads[-1]["details"]["model"], "gemini-3-flash-preview")
         self.assertTrue(str(payloads[-2]["report"]).startswith("# Report"))
 
     def test_build_research_request_normalizes_spanish_query(self):

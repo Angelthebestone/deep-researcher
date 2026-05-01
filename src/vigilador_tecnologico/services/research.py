@@ -187,7 +187,17 @@ class ResearchService:
         )
 
         if progress_callback:
-            progress_callback("ResearchPlanCreated", plan_context)
+            progress_callback("ResearchPlanCreated", {
+                "stage": "ResearchPlanCreated",
+                "model": plan_context.get("model"),
+                "duration_ms": plan_context.get("duration_ms"),
+                "fallback_reason": plan_context.get("fallback_reason"),
+                "breadth": plan["breadth"],
+                "depth": plan["depth"],
+                "plan_summary": plan["plan_summary"],
+                "branch_count": len(plan["branches"]),
+                "branches": [{"branch_id": b["branch_id"], "provider": b["provider"]} for b in plan["branches"]],
+            })
 
         gemini_adapter = self.adapter or GeminiAdapter(model=self.model)
         mistral_adapter = self.fallback_adapter or MistralAdapter(model=self.fallback_model)
@@ -217,10 +227,13 @@ class ResearchService:
 
             if progress_callback:
                 progress_callback("ResearchNodeEvaluated", {
+                    "stage": "ResearchNodeEvaluated",
                     "branch_id": branch_result["branch_id"],
                     "provider": branch_result["provider"],
                     "executed_queries": branch_result["executed_queries"],
                     "learnings_count": len(branch_result["learnings"]),
+                    "source_urls": branch_result["source_urls"][:5],
+                    "learnings_preview": branch_result["learnings"][:2],
                 })
 
         synthesizer_service = SynthesizerService()

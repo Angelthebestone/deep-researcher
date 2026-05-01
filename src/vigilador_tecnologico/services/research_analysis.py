@@ -23,7 +23,7 @@ class ResearchAnalysisService:
     gemma_adapter: GeminiAdapter
     mistral_review_adapter: MistralAdapter
     retry_attempts: int = 2
-    retry_delay_seconds: float = 3.0
+    retry_delay_seconds: float = 7.0
 
     async def analyze(
         self,

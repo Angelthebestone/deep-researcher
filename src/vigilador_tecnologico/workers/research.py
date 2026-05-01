@@ -40,12 +40,12 @@ class ResearchWorker:
     gemma_analyst_model: str = GEMMA_4_26B_MODEL
     mistral_review_model: str = MISTRAL_REVIEW_MODEL
     retry_attempts: int = 2
-    retry_delay_seconds: float = 3.0
-    retry_backoff_factor: float = 4.0
+    retry_delay_seconds: float = 7.0
+    retry_backoff_factor: float = 5.0
 
     def __post_init__(self) -> None:
-        if self.retry_delay_seconds < 3.0:
-            self.retry_delay_seconds = 3.0
+        if self.retry_delay_seconds < 7.0:
+            self.retry_delay_seconds = 7.0
 
     async def run_branch(
         self,

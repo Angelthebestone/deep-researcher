@@ -9,7 +9,7 @@ Sistema empresarial de vigilancia tecnológica basado en agentes de IA que anali
 - **Python 3.13** - Lenguaje principal
 - **FastAPI** - API Gateway con SSE streaming
 - **Gemini/Gemma/Mistral** - Modelos de IA para extracción, investigación y síntesis
-- **LangGraph** - Orquestación de investigación (fase 4 eliminado, ver changelog)
+- **async/await** - Orquestación directa de investigación en `ResearchService.execute_full_research()`
 
 ## Estructura del Proyecto
 
@@ -179,6 +179,7 @@ class StageContext(TypedDict):
 5. **Streaming First**: Operaciones largas emiten SSE progress
 6. **Explicit Fallback**: Registrar `fallback_reason` en `stage_context`
 7. **JSON Validation First**: Parsear y validar todo JSON de LLM antes de usar
+8. **Ejecución Secuencial**: `workers/research.py` ejecuta ramas de investigación secuencialmente; sin concurrencia entre modelos
 
 ### Logging
 - **Riesgos críticos**: `logger.warning("CriticalRiskAlert", extra={...})`
@@ -216,6 +217,24 @@ python -m unittest tests.test_operational_endpoints tests.test_document_analyze
 
 ## Changelog Reciente
 
+### v1.2 - Frontend Zen-Data y SSE Fixes (2026-05-01)
+
+**Frontend refactor completo**
+- Nuevo diseño Zen-Data: minimal, non-boxy, fondo blanco/smoke con acentos morado y lima
+- Navegacion dual-view (Chat | Graph) via toggle flotante con Framer Motion
+- Componentes reorganizados en `components/chat/`, `components/graph/`, `components/layout/`, `components/research/`
+- Eliminados 9 componentes UI primitivos personalizados; migrados a HeroUI (NextUI v2)
+- Estado global con Zustand en `stores/appStore.ts`
+- Hook `useChatStream` para lifecycle SSE con deduplicacion, timeout y manejo de errores
+- Renderizado markdown con `react-markdown` + `remark-gfm`
+- `ThinkingTimeline` colapsable por defecto, tipo debug console
+
+**Backend SSE fixes**
+- `_sse_formatters.py` normaliza eventos `failed` a `event_type: "AnalysisFailed"`
+- `_research_operations.py` pasa `stage_context` plano en `details` (no anidado)
+- `execute_research_operation` incluye timeout de 300s
+- Enriquecido `progress_callback` con `plan_summary`, `branch_count`, `source_urls`, `learnings_preview`
+
 ### v1.1 - Simplificación (2026-04-30)
 
 **Fase 1: StageContext simplificado**
@@ -251,7 +270,7 @@ python -m unittest tests.test_operational_endpoints tests.test_document_analyze
 
 ## Documentación Adicional
 
-- **Arquitectura detallada**: `.qwen/skills/vigilador-architecture/` (invocar con `/skill vigilador-architecture`)
+- **Arquitectura detallada**: `../../AGENTS.md` y `../../spec.md`
 - **Especificación completa**: `spec.md` en raíz del proyecto
 - **Reglas del proyecto**: `.vscode/rules.md`
 - **Frontend**: `frontend/README.md`

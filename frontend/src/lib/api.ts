@@ -117,7 +117,12 @@ export function streamChatResearch(
 ) {
   const source = new EventSource(createChatStreamUrl(query, idempotencyKey));
   source.onmessage = (event) => {
-    onEvent(JSON.parse(event.data) as ChatStreamEvent);
+    try {
+      const data = JSON.parse(event.data) as ChatStreamEvent;
+      onEvent(data);
+    } catch {
+      // Ignore malformed SSE payloads
+    }
   };
   return source;
 }

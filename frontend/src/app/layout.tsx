@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 
 import "./globals.css";
+import { Providers } from "./providers";
 
 const bodyFont = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -28,7 +29,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={`${bodyFont.variable} ${displayFont.variable} font-sans antialiased`}>{children}</body>
+      <body className={`${bodyFont.variable} ${displayFont.variable} font-sans antialiased`}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

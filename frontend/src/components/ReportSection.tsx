@@ -3,10 +3,10 @@
 import { useMemo } from "react";
 import { Download, Printer, ShieldAlert, Sparkles, Target } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Chip } from "@nextui-org/react";
+import { Button } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, CardFooter } from "@nextui-org/react";
+import { Divider } from "@nextui-org/react";
 import { apiBaseUrl } from "@/lib/api";
 import type { TechnologyReport } from "@/types/contracts";
 
@@ -18,12 +18,12 @@ type ReportSectionProps = {
 
 function severityTone(value: string) {
   if (value === "critical" || value === "high") {
-    return "destructive";
+    return "danger";
   }
   if (value === "medium") {
     return "secondary";
   }
-  return "outline";
+  return "default";
 }
 
 export function ReportSection({ documentId, report, onExportPdf }: ReportSectionProps) {
@@ -42,14 +42,14 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <CardTitle className="font-display text-xl">Veredicto final</CardTitle>
-            <CardDescription>Executive summary, riesgos, recomendaciones y fuentes verificables.</CardDescription>
+            <h3 className="font-display text-xl">Veredicto final</h3>
+            <p className="text-sm text-muted-foreground">Executive summary, riesgos, recomendaciones y fuentes verificables.</p>
           </div>
           <div data-report-actions className="flex flex-wrap gap-2">
             <Button
-              variant="outline"
+              variant="bordered"
               size="sm"
-              startIcon={<Download />}
+              startContent={<Download className="size-4" />}
               disabled={!documentId}
               onClick={() => {
                 if (!documentId) {
@@ -64,13 +64,13 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
             >
               Markdown
             </Button>
-            <Button variant="secondary" size="sm" startIcon={<Printer />} disabled={!report} onClick={onExportPdf}>
+            <Button color="secondary" variant="flat" size="sm" startContent={<Printer className="size-4" />} disabled={!report} onClick={onExportPdf}>
               PDF
             </Button>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardBody className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
             <div key={metric.label} className="rounded-[1.5rem] border border-border bg-background/70 p-4">
@@ -105,7 +105,7 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="font-medium">{risk.technology_name}</div>
-                      <Badge variant={severityTone(risk.severity)}>{risk.severity}</Badge>
+                      <Chip color={severityTone(risk.severity)} variant="flat" size="sm">{risk.severity}</Chip>
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">{risk.description}</p>
                     {risk.source_urls?.length ? (
@@ -147,13 +147,13 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="font-medium">{recommendation.technology_name}</div>
-                      <Badge variant="success">{recommendation.priority}</Badge>
+                      <Chip color="success" variant="flat" size="sm">{recommendation.priority}</Chip>
                     </div>
                     <p className="mt-2 text-sm font-medium text-foreground">{recommendation.action}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{recommendation.rationale}</p>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <Badge variant="outline">Effort {recommendation.effort}</Badge>
-                      <Badge variant="outline">Impact {recommendation.impact}</Badge>
+                      <Chip variant="bordered" size="sm">Effort {recommendation.effort}</Chip>
+                      <Chip variant="bordered" size="sm">Impact {recommendation.impact}</Chip>
                     </div>
                   </div>
                 ))
@@ -166,7 +166,7 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
           </div>
         </div>
 
-        <Separator />
+        <Divider />
 
         <div className="grid gap-4 xl:grid-cols-2">
           <div className="rounded-[1.75rem] border border-border bg-background/80 p-5">
@@ -183,9 +183,9 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
                         <div className="font-medium">{item.normalized_name}</div>
                         <div className="text-xs text-muted-foreground">{item.technology_name}</div>
                       </div>
-                      <Badge variant={item.status === "current" ? "success" : item.status === "emerging" ? "secondary" : "outline"}>
+                      <Chip color={item.status === "current" ? "success" : item.status === "emerging" ? "secondary" : "default"} variant={item.status === "current" ? "flat" : item.status === "emerging" ? "flat" : "bordered"} size="sm">
                         {item.category}
-                      </Badge>
+                      </Chip>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                       <span>Mentions: {item.mention_count}</span>
@@ -195,9 +195,9 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
                     {item.evidence_ids?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {item.evidence_ids.map((id) => (
-                          <Badge key={id} variant="outline">
+                          <Chip key={id} variant="bordered" size="sm">
                             {id}
-                          </Badge>
+                          </Chip>
                         ))}
                       </div>
                     ) : null}
@@ -226,7 +226,7 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
                     <div className="font-medium">{source.title}</div>
                     <div className="mt-1 text-xs text-muted-foreground">{source.url}</div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <Badge variant="outline">{source.source_type ?? "source"}</Badge>
+                      <Chip variant="bordered" size="sm">{source.source_type ?? "source"}</Chip>
                       <span>{source.retrieved_at}</span>
                     </div>
                   </a>
@@ -239,7 +239,7 @@ export function ReportSection({ documentId, report, onExportPdf }: ReportSection
             </div>
           </div>
         </div>
-      </CardContent>
+      </CardBody>
     </Card>
   );
 }

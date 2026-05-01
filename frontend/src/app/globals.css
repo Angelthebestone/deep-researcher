@@ -54,23 +54,9 @@
 }
 
 @layer components {
-  .dashboard-shell {
-    position: relative;
-  }
-
   .ai-shell {
     position: relative;
     isolation: isolate;
-  }
-
-  .ai-glass {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.72));
-    backdrop-filter: blur(22px);
-  }
-
-  .ai-panel {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(250, 250, 255, 0.92));
-    backdrop-filter: blur(14px);
   }
 
   .ai-grid {
@@ -114,10 +100,6 @@
 @media print {
   body[data-print-mode="report"] {
     background: white !important;
-  }
-
-  body[data-print-mode="report"] .dashboard-shell > *:not([data-report-panel]) {
-    display: none !important;
   }
 
   body[data-print-mode="report"] [data-report-panel] {

@@ -26,8 +26,8 @@ class WebSearchService:
     gemini_adapter: GeminiAdapter
     mistral_adapter: MistralAdapter
     retry_attempts: int = 2
-    retry_delay_seconds: float = 3.0
-    retry_backoff_factor: float = 4.0
+    retry_delay_seconds: float = 7.0
+    retry_backoff_factor: float = 5.0
 
     async def search_branch(self, branch: ResearchPlanBranch, *, query: str, target_technology: str) -> dict[str, Any]:
         if branch["provider"] == "gemini_grounded":

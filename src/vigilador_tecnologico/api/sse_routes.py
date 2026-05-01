@@ -153,11 +153,16 @@ async def research_event_stream(
     else:
         operation_id = str(operation["operation_id"])
         reused = reused_operation
-        if not reused:
-            _mark_research_requested(operation_id, request)
+
     live_task: asyncio.Task[Any] | None = None
     if not reused:
-        live_task = asyncio.create_task(_execute_research_operation(request, operation_id, custom_query, research_service))
+        _mark_research_requested(operation_id, request)
+        live_task = asyncio.create_task(
+            _execute_research_operation(
+                request, operation_id,
+                custom_query=custom_query, research_service=research_service,
+            )
+        )
     emitted_event_ids: set[str] = set()
     sequence = max(0, sequence_start - 1)
     try:
@@ -282,6 +287,7 @@ async def stream_chat_research(query: str, idempotency_key: str | None = None):
             )
             yield f"data: {json.dumps(prompt_event, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.05)
+
             async for event in research_event_stream(request, custom_query=refined_query, operation=operation, reused_operation=False, sequence_start=3):
                 yield event
         except Exception as error:

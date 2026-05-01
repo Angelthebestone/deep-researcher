@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Chip } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, CardFooter } from "@nextui-org/react";
+import { Divider } from "@nextui-org/react";
 import { cn } from "@/lib/utils";
 import type { ChatStreamEvent } from "@/types/contracts";
 import { ChevronDown, ChevronRight, Clock3, Database, FileText, Network, Sparkles } from "lucide-react";
@@ -34,10 +34,10 @@ export function ResearchEventStream({ events }: { events: ChatStreamEvent[] }) {
   return (
     <Card className="border-border/70 shadow-soft">
       <CardHeader>
-        <CardTitle className="font-display text-xl">Eventos SSE</CardTitle>
-        <CardDescription>Registro en vivo del flujo de investigación.</CardDescription>
+        <h3 className="font-display text-xl">Eventos SSE</h3>
+        <p className="text-sm text-muted-foreground">Registro en vivo del flujo de investigación.</p>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardBody className="space-y-3">
         {events.length ? (
           events.map((event) => {
             const Icon = eventIcon(event.event_type);
@@ -59,8 +59,8 @@ export function ResearchEventStream({ events }: { events: ChatStreamEvent[] }) {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold text-slate-900">{event.event_type}</p>
-                        <Badge variant={event.operation_status === "completed" ? "success" : "secondary"}>#{event.sequence}</Badge>
-                        <Badge variant={event.operation_status === "failed" ? "destructive" : "outline"}>{event.operation_status}</Badge>
+                        <Chip color={event.operation_status === "completed" ? "success" : "secondary"} variant="flat" size="sm">#{event.sequence}</Chip>
+                        <Chip color={event.operation_status === "failed" ? "danger" : "default"} variant={event.operation_status === "failed" ? "flat" : "bordered"} size="sm">{event.operation_status}</Chip>
                       </div>
                       <p className="text-xs text-slate-500">{event.message}</p>
                     </div>
@@ -73,7 +73,7 @@ export function ResearchEventStream({ events }: { events: ChatStreamEvent[] }) {
                   </span>
                 </summary>
 
-                <Separator className="my-3" />
+                <Divider className="my-3" />
 
                 <div className="grid gap-3 text-sm">
                   <div className="flex flex-wrap gap-3 text-xs text-slate-500">
@@ -111,7 +111,7 @@ export function ResearchEventStream({ events }: { events: ChatStreamEvent[] }) {
           </div>
         )}
         <div ref={endRef} />
-      </CardContent>
+      </CardBody>
     </Card>
   );
 }

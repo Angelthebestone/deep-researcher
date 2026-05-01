@@ -15,9 +15,9 @@ Construir un sistema empresarial de vigilancia tecnológica basado en agentes qu
 * **Proveedor primario fijado para búsqueda web en producción:** Gemini 3.1 Flash Lite Preview, seleccionado por headroom de cuota free-tier y capacidad de grounding.
 * **Proveedor primario fijado para razonamiento/normalización en producción:** Gemma 4 31B / 26B, reservado para no consumir cuota del buscador.
 * **Proveedor primario fijado para síntesis final en producción:** Gemini 3 Flash Preview.
-* **Orquestación Máquina de Estados:** LangGraph.
+* **Orquestación de investigación:** async/await direct orchestration en `ResearchService`.
 * **Capa Exposición/Streaming:** FastAPI con Server-Sent Events (SSE).
-* **Investigación profunda:** Bucle LangGraph con una sola mejora de prompt, planificación obligatoria en Gemma 4 31B y dos ramas seriales de research: `Gemini 3.1 Flash Lite -> Gemma 4 26B -> Embeddings` y `Mistral Small 4 -> Mistral Large Latest -> Embeddings`.
+* **Investigación profunda:** Bucle de research con una sola mejora de prompt, planificación obligatoria en Gemma 4 31B y dos ramas seriales de research: `Gemini 3.1 Flash Lite -> Gemma 4 26B -> Embeddings` y `Mistral Small 4 -> Mistral Large Latest -> Embeddings`.
 * **Embeddings:** Gemini Embedding 2, activo después de cada iteración validada para generar relaciones semánticas, agrupar evidencia y alimentar la síntesis final.
 
 ## Servicios
@@ -46,9 +46,10 @@ El `storage-service` se compone como monolito modular sobre disco local y debe e
 El `api-gateway` tambien expone `GET /api/v1/research/stream?technology=...&breadth=...&depth=...` para reproducir la investigacion profunda. Cuando la misma `idempotency_key` ya existe, el stream reutiliza el mismo `operation_id` y reemite los eventos persistidos sin volver a ejecutar el grafo.
 
 ## Frontend web
-El frontend vive en `frontend/` y se despliega como `dashboard-web`. Es una app Next.js 14 con App Router, React 18, TypeScript 6 y Tailwind CSS. Su trabajo es consumir el backend, renderizar la ingesta, el stream SSE, el grafo, el reporte final y la capa de snapshots para que la UI pueda rehidratar estado sin volver a ejecutar el pipeline.
-`AnalysisStream` consume `stage_context` y `failed_stage` desde los eventos SSE para mostrar la etapa exacta, el modelo usado y el punto de fallo real sin exponer razonamiento crudo.
-En modo chat, `AnalysisStream` puede recibir un `document_id` sintético del research para mantener trazabilidad, pero solo hidrata menciones y reportes cuando el evento pertenece a un `documentId` real del pipeline de documentos.
+El frontend vive en `frontend/` y se despliega como `dashboard-web`. Es una app Next.js 14 con App Router, React 18, TypeScript 6, Tailwind CSS y HeroUI (NextUI v2). Su trabajo es consumir el backend, renderizar la ingesta, el stream SSE, el grafo, el reporte final y la capa de snapshots para que la UI pueda rehidratar estado sin volver a ejecutar el pipeline.
+El estado global se gestiona con Zustand en `stores/appStore.ts`. Los mensajes del chat se renderizan con `react-markdown` y `remark-gfm` para soportar tablas, listas y formato enriquecido.
+`ChatView` consume `stage_context` y `failed_stage` desde los eventos SSE para mostrar la etapa exacta, el modelo usado y el punto de fallo real sin exponer razonamiento crudo.
+En modo chat, `ChatView` puede recibir un `document_id` sintético del research para mantener trazabilidad, pero solo hidrata menciones y reportes cuando el evento pertenece a un `documentId` real del pipeline de documentos.
 
 ### Responsabilidades
 * Subir documentos y construir el `document_id` estable.
@@ -60,14 +61,18 @@ En modo chat, `AnalysisStream` puede recibir un `document_id` sintético del res
 
 ### Estructura del frontend
 * `frontend/src/app/layout.tsx`: layout global, metadata y carga de estilos.
-* `frontend/src/app/page.tsx`: punto de entrada que monta `DashboardWorkspace`.
+* `frontend/src/app/page.tsx`: punto de entrada que monta `AppShell`.
 * `frontend/src/app/globals.css`: tokens visuales, fondo, sombras y reglas de impresion.
-* `frontend/src/components/DashboardWorkspace.tsx`: orquestador de estado de la UI y coordinador del flujo upload -> analyze -> SSE -> report.
-* `frontend/src/components/DocumentIngest.tsx`: selector de archivos, lectura Base64, inferencia de `source_type` y subida.
-* `frontend/src/components/AnalysisStream.tsx`: cliente SSE, deduplicacion por `event_id`, carga diferida de menciones, operation record y reporte.
-* `frontend/src/components/KnowledgeGraph.tsx`: vista interactiva de nodos con evidencias, vendor, version, URLs y alternativas.
-* `frontend/src/components/ReportSection.tsx`: vista del reporte, metricas resumidas y enlaces de descarga.
-* `frontend/src/components/ui/`: primitives de UI reutilizables.
+* `frontend/src/components/layout/AppShell.tsx`: shell raiz con navegacion dual-view (Chat | Graph).
+* `frontend/src/components/layout/ViewToggle.tsx`: toggle flotante para cambiar entre Chat y Graph.
+* `frontend/src/components/chat/ChatView.tsx`: vista de conversacion, lista de mensajes y timeline de razonamiento.
+* `frontend/src/components/chat/ChatInputBar.tsx`: barra de entrada flotante para enviar mensajes y comandos.
+* `frontend/src/components/chat/MessageBubble.tsx`: renderizado de mensajes con `react-markdown` y soporte GFM.
+* `frontend/src/components/chat/ThinkingTimeline.tsx`: timeline de razonamiento y progreso de etapas.
+* `frontend/src/components/research/ResearchConsole.tsx`: panel de parametros de investigacion (profundidad, amplitud).
+* `frontend/src/components/graph/GraphView.tsx`: vista inmersiva del grafo de conocimiento a pantalla completa.
+* `frontend/src/hooks/useChatStream.ts`: hook de lifecycle para conexion SSE de chat/research.
+* `frontend/src/stores/appStore.ts`: store Zustand para estado global de la UI (vista activa, mensajes, operation record).
 * `frontend/src/lib/api.ts`: helpers HTTP y constructores de URLs SSE/descarga.
 * `frontend/src/lib/utils.ts`: utilidades de UI.
 * `frontend/src/services/supabaseClient.ts`: persistencia de snapshots y artifacts del dashboard en Supabase o `localStorage`.
@@ -84,18 +89,19 @@ En modo chat, `AnalysisStream` puede recibir un `document_id` sintético del res
 * `NEXT_PUBLIC_SUPABASE_ANON_KEY`: clave anonima de Supabase usada por el dashboard.
 
 ### Flujo de datos del dashboard
-1. `DocumentIngest` lee el archivo, lo convierte a Base64 y llama `uploadDocument`.
-2. `DashboardWorkspace` genera y conserva el `idempotency_key`: derivado del documento para análisis documental y único por intento para `chat/stream`.
-3. `DashboardWorkspace` dispara `POST /api/v1/documents/{document_id}/analyze` como operación ligera y abre `AnalysisStream` para seguir el progreso sin duplicar eventos.
-4. `DashboardWorkspace` y `AnalysisStream` persisten snapshots del estado de la UI para rehidratacion posterior.
-5. `KnowledgeGraph` consume menciones persistidas y el reporte para mostrar nodos, alternativas y fuentes.
-6. `ReportSection` muestra el reporte final y habilita la descarga Markdown/PDF una vez disponible.
+1. `ChatInputBar` envia el mensaje o comando → `appStore`.
+2. `AppShell` genera y conserva el `idempotency_key`: derivado del documento para análisis documental y único por intento para `chat/stream`.
+3. `AppShell` dispara `POST /api/v1/documents/{document_id}/analyze` como operación ligera y `ChatView` escucha el progreso vía SSE sin duplicar eventos.
+4. `ChatView` renderiza mensajes del usuario y del sistema, incluyendo `ThinkingTimeline` durante el razonamiento.
+5. `GraphView` renderiza el grafo de conocimiento en vista inmersiva a pantalla completa.
+6. `ResearchConsole` controla los parametros de profundidad (`depth`) y amplitud (`breadth`) de la investigacion.
+7. `appStore` y los componentes de chat persisten snapshots del estado de la UI para rehidratacion posterior.
 
 ### Rutas y proxy
-* El browser muestra la UI en `http://localhost:3000`, pero las llamadas API del dashboard van por defecto a `http://127.0.0.1:8000`.
+* El browser muestra la UI en `http://localhost:3001`, pero las llamadas API del dashboard van por defecto a `http://127.0.0.1:8000`.
 * `frontend/src/lib/api.ts` usa `NEXT_PUBLIC_API_BASE_URL` si existe; si no, cae al backend directo en `127.0.0.1:8000`.
 * `frontend/next.config.mjs` conserva rewrites hacia `BACKEND_API_BASE_URL` como compatibilidad local y para acceso manual, pero el cliente ya no depende del proxy para upload/analyze.
-* En docker-compose, `dashboard-web` queda en `3000` y el backend logico en `8000`.
+* En docker-compose, `dashboard-web` queda en `3001` y el backend logico en `8000`.
 
 ### Contratos que usa el frontend
 * `frontend/src/types/contracts.ts` debe permanecer alineado con `src/vigilador_tecnologico/contracts/models.py` y con los JSON Schemas de `schemas/`.
@@ -104,8 +110,8 @@ En modo chat, `AnalysisStream` puede recibir un `document_id` sintético del res
 
 ### Comportamiento operativo
 * La UI conserva estado de documento, menciones, operation record, eventos SSE y reporte para poder restaurar una sesion por `document_id`.
-* `AnalysisStream` deduplica por `event_id` y no debe volver a abrir un `EventSource` en cada re-render.
-* `AnalysisStream` no debe hidratar menciones o reporte para `chat/stream` si no existe `documentId` del pipeline de documentos.
+* `ChatView` deduplica por `event_id` y no debe volver a abrir un `EventSource` en cada re-render.
+* `ChatView` no debe hidratar menciones o reporte para `chat/stream` si no existe `documentId` del pipeline de documentos.
 * `supabaseClient` persiste primero en Supabase y, si no esta disponible, usa `localStorage` como respaldo local.
 * La capa de estilos vive en `globals.css` y define tokens visuales, fondo, estados de impresion y el shell del dashboard.
 
@@ -116,7 +122,7 @@ El pipeline debe operar con eventos idempotentes y reintentos controlados.
 * `DocumentParsed`
 * `TechnologiesExtracted`
 * `TechnologiesNormalized`
-* `ResearchRequested` (Dispara la máquina de estados de LangGraph)
+* `ResearchRequested` (Dispara la orquestación de investigación en `ResearchService`)
 * `ResearchNodeEvaluated` (Emite un progreso SSE informando el avance de cada nodo o tecnología evaluada)
 * `ResearchCompleted`
 * `ReportGenerated`
@@ -304,9 +310,9 @@ El pipeline debe operar con eventos idempotentes y reintentos controlados.
 * El endpoint `GET /api/v1/documents/{document_id}/analyze/stream` debe exponer SSE con `DocumentParsed`, `TechnologiesExtracted`, `TechnologiesNormalized`, `ResearchRequested`, `ResearchNodeEvaluated`, `ResearchCompleted` y `ReportGenerated`, sin duplicar eventos dentro de una misma ejecución.
 * El análisis documental debe usar `idempotency_key`; si una operación `analysis` con la misma clave y `document_id` ya existe, el endpoint debe devolver el mismo `operation_id` y no volver a ejecutar servicios de extracción, normalización o investigación.
 * El endpoint `GET /api/v1/research/stream` debe conservar el orden canónico del research serial: `ResearchRequested -> ResearchNodeEvaluated` repetido por cada iteración válida -> `ResearchCompleted`. Si la ejecución termina por error, el cierre compartido sigue siendo `AnalysisFailed` y el `stage_context` debe indicar la etapa real del fallo; los timeouts de `ResearchExecution` deben marcar `timeout=true` en `details`.
-* El endpoint `GET /api/v1/chat/stream` debe emitir eventos con el mismo sobre de contrato que `GET /api/v1/documents/{document_id}/analyze/stream`, incluyendo `event_id`, `sequence`, `operation_id`, `operation_type`, `operation_status`, `event_type`, `document_id`, `idempotency_key`, `details` y `stage_context`. El flujo conversacional debe reflejar actividad inmediata con `PromptImprovementStarted`, persistir una request canónica antes de ejecutar LangGraph, continuar con `PromptImproved` sin reescribir `target_technology`, `breadth` ni `depth`, y solo después emitir `ResearchRequested` y `ResearchPlanCreated`. Si el frontend reintenta la misma consulta con un nuevo `idempotency_key`, el backend debe crear una nueva operación; si reusa el mismo `idempotency_key`, debe reemitir la operación existente.
+* El endpoint `GET /api/v1/chat/stream` debe emitir eventos con el mismo sobre de contrato que `GET /api/v1/documents/{document_id}/analyze/stream`, incluyendo `event_id`, `sequence`, `operation_id`, `operation_type`, `operation_status`, `event_type`, `document_id`, `idempotency_key`, `details` y `stage_context`. El flujo conversacional debe reflejar actividad inmediata con `PromptImprovementStarted`, persistir una request canónica antes de ejecutar la investigación, continuar con `PromptImproved` sin reescribir `target_technology`, `breadth` ni `depth`, y solo después emitir `ResearchRequested` y `ResearchPlanCreated`. Si el frontend reintenta la misma consulta con un nuevo `idempotency_key`, el backend debe crear una nueva operación; si reusa el mismo `idempotency_key`, debe reemitir la operación existente.
 * **Standardized Context**: Todos los servicios deben utilizar la utilidad centralizada `build_stage_context` para construir los metadatos de etapa, asegurando consistencia en el audit log y los eventos SSE.
-* **Decoupled Nodes**: Los nodos de LangGraph deben delegar la lógica de generación (prompts, parsing) a servicios especializados (`PlanningService`, `SynthesizerService`), manteniendo los nodos como meros orquestadores asíncronos.
+* **Decoupled Nodes**: Los nodos de investigación deben delegar la lógica de generación (prompts, parsing) a servicios especializados (`PlanningService`, `SynthesizerService`), manteniendo los nodos como meros orquestadores asíncronos.
 * Cuando una etapa degrade por fallback, `stage_context.fallback_reason` debe usar una taxonomía estable: `timeout`, `invalid_json`, `empty_response`, `provider_failure`, `grounded_postprocess`, `planner_fallback`, `gemini_timeout_to_mistral`, `empty_local_fallback` o `invalid_local_fallback`.
 * El estado documental debe persistirse en un sidecar `status.json` y poder consultarse sin volver a ejecutar la extracción.
 * Las menciones extraídas y normalizadas, resultados de investigación, grafo, reportes, embeddings y eventos de auditoría deben persistirse mediante repositorios dedicados del `storage-service`.
@@ -318,7 +324,7 @@ El pipeline debe operar con eventos idempotentes y reintentos controlados.
 * Los JSON Schemas exactos deben mantenerse alineados con los contratos tipados y validarse automáticamente contra enums, required fields y formatos de fecha.
 * La batería de regresión principal debe ejecutarse en CI mediante GitHub Actions en cada `push` a `main` y cada `pull_request`.
 * **Protección Anti-God-Prompt:** Toda extracción web deberá reducirse a *Learnings* limitados mediante Gemini 3.1 Flash Lite con grounding previo a su transmisión al nodo final, mitigando desbordamientos de la ventana de contexto.
-* Las iteraciones del grafo de Deep Research (`ResearchRequested`) deben acatar los límites matemáticos rígidos de Amplitud (`Breadth`) y Profundidad (`Depth`): cada ronda del planner produce como máximo `breadth` queries únicas, el worker ejecuta como máximo ese presupuesto por ronda y `depth` solo avanza al cerrar cada extracción web.
+* Las iteraciones de Deep Research (`ResearchRequested`) deben acatar los límites matemáticos rígidos de Amplitud (`Breadth`) y Profundidad (`Depth`): cada ronda del planner produce como máximo `breadth` queries únicas, el worker ejecuta como máximo ese presupuesto por ronda y `depth` solo avanza al cerrar cada extracción web.
 * El pipeline documental debe usar un contrato explícito de investigación (`breadth=3`, `depth=1`) sin introspección dinámica de la firma del servicio.
 * Los eventos SSE no deben reutilizar un campo `report` ambiguo. El flujo de research debe usar `report_markdown`; el pipeline documental debe usar `report_artifact`.
 * Cada recomendación debe incluir fuentes verificables.
@@ -340,7 +346,7 @@ La primera implementación del workspace queda organizada así:
 * `src/vigilador_tecnologico/contracts`: contratos de datos exactos para el pipeline.
 * `src/vigilador_tecnologico/storage`: persistencia de archivos, vectores, grafo y auditoría.
 * `src/vigilador_tecnologico/integrations`: adaptadores a Gemini, Groq y APIs externas.
-* `src/vigilador_tecnologico/pipeline`: orquestación de eventos y pasos del flujo mediante grafos **LangGraph**.
+* `src/vigilador_tecnologico/pipeline`: orquestación de eventos y pasos del flujo mediante async/await.
 * `src/vigilador_tecnologico/models`: tipos de dominio compartidos.
 * `schemas/`: representación JSON Schema de los contratos principales.
 * `frontend/`: dashboard Next.js con UI de ingesta, analisis, SSE, grafo y reporte.

@@ -1,5 +1,5 @@
-import { DashboardWorkspace } from "@/components/DashboardWorkspace";
+import { AppShell } from "@/components/layout/AppShell";
 
 export default function Page() {
-  return <DashboardWorkspace />;
+  return <AppShell />;
 }

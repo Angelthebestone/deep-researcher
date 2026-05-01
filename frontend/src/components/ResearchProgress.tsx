@@ -1,8 +1,8 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Chip } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, CardFooter } from "@nextui-org/react";
+import { Progress } from "@nextui-org/react";
 import { cn } from "@/lib/utils";
 import type { ChatStreamEvent } from "@/types/contracts";
 import type { LucideIcon } from "lucide-react";
@@ -76,19 +76,19 @@ export function ResearchProgress({ events }: { events: ChatStreamEvent[] }) {
       <CardHeader className="space-y-2">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="font-display text-xl">Progreso de investigación</CardTitle>
-            <CardDescription>Seguimiento de los 7 eventos SSE del backend validado.</CardDescription>
+            <h3 className="font-display text-xl">Progreso de investigación</h3>
+            <p className="text-sm text-muted-foreground">Seguimiento de los 7 eventos SSE del backend validado.</p>
           </div>
-          <Badge variant={latestEvent ? "secondary" : "outline"}>
+          <Chip color={latestEvent ? "secondary" : "default"} variant={latestEvent ? "flat" : "bordered"} size="sm">
             {latestEvent ? latestEvent.event_type : "Sin eventos"}
-          </Badge>
+          </Chip>
         </div>
         <div className="flex items-center gap-3">
           <Progress value={percent} className="h-2 flex-1" />
           <span className="min-w-12 text-right text-sm font-semibold text-slate-700">{percent}%</span>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <CardBody className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {STAGES.map((stage, index) => {
           const Icon = stage.icon;
           const isCompleted = index < activeIndex || (latestEvent?.event_type === stage.eventType && latestEvent.operation_status === "completed");
@@ -120,7 +120,7 @@ export function ResearchProgress({ events }: { events: ChatStreamEvent[] }) {
             </div>
           );
         })}
-      </CardContent>
+      </CardBody>
     </Card>
   );
 }

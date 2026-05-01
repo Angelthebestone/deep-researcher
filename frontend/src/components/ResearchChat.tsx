@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, LoaderCircle, Sparkles } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { Chip } from "@nextui-org/react";
+import { Button } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, CardFooter } from "@nextui-org/react";
+import { Input } from "@nextui-org/react";
+import { Divider } from "@nextui-org/react";
 import { streamChatResearch } from "@/lib/api";
 import type { ChatStreamEvent } from "@/types/contracts";
 
@@ -110,12 +110,12 @@ export function ResearchChat() {
         <CardHeader className="space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle className="font-display text-2xl">Investigación conversacional</CardTitle>
-              <CardDescription>Envía una consulta real y sigue los 7 eventos SSE del backend validado.</CardDescription>
+              <h3 className="font-display text-2xl">Investigación conversacional</h3>
+              <p className="text-sm text-muted-foreground">Envía una consulta real y sigue los 7 eventos SSE del backend validado.</p>
             </div>
-            <Badge variant={status === "complete" ? "success" : status === "failed" ? "destructive" : "secondary"}>
+            <Chip color={status === "complete" ? "success" : status === "failed" ? "danger" : "secondary"} variant="flat" size="sm">
               {status}
-            </Badge>
+            </Chip>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
@@ -148,10 +148,10 @@ export function ResearchChat() {
 
         <Card className="border-border/70 shadow-soft">
           <CardHeader>
-            <CardTitle className="font-display text-xl">Reporte final</CardTitle>
-            <CardDescription>{report ? "Reporte markdown recibido del backend." : "Aun no hay reporte final."}</CardDescription>
+            <h3 className="font-display text-xl">Reporte final</h3>
+            <p className="text-sm text-muted-foreground">{report ? "Reporte markdown recibido del backend." : "Aun no hay reporte final."}</p>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardBody className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span>Eventos: {events.length}</span>
               <span>•</span>
@@ -159,7 +159,7 @@ export function ResearchChat() {
               <span>•</span>
               <span>Ultimo evento: {latestEvent?.event_type ?? "n/a"}</span>
             </div>
-            <Separator />
+            <Divider />
             {report ? (
               <pre className="max-h-[62vh] overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-950 p-4 text-sm leading-6 text-slate-100">
                 {report}
@@ -169,7 +169,7 @@ export function ResearchChat() {
                 Escribe una consulta y espera a que llegue el evento <span className="font-medium text-slate-700">ResearchCompleted</span>.
               </div>
             )}
-          </CardContent>
+          </CardBody>
         </Card>
       </div>
     </div>

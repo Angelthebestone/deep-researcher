@@ -1,9 +1,9 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Chip } from "@nextui-org/react";
+import { Button } from "@nextui-org/react";
 import { ReportSection } from "@/components/ReportSection";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@nextui-org/react";
 import { CheckCircle2, FileUp, Play, Sparkles } from "lucide-react";
 import type {
   DocumentMentionsResponse,
@@ -96,12 +96,12 @@ export function ChatMessages({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {msg.mentions.normalized.slice(0, 8).map((tech) => (
-                      <Badge key={tech.normalized_name} className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">
+                      <Chip key={tech.normalized_name} className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none">
                         {tech.normalized_name}
-                      </Badge>
+                      </Chip>
                     ))}
                     {msg.mentions.normalized.length > 8 && (
-                      <Badge variant="outline">+{msg.mentions.normalized.length - 8} mas</Badge>
+                      <Chip variant="bordered" size="sm">+{msg.mentions.normalized.length - 8} mas</Chip>
                     )}
                   </div>
                 </div>
@@ -130,7 +130,7 @@ export function ChatMessages({
               )}
 
               {msg.role === "assistant" && msg.content?.includes("Deseas iniciar") && canAnalyze && !isAnalyzing && !operation && (
-                <Button onClick={onStartAnalysis} variant="default" className="mt-4 w-full sm:w-auto shadow-md">
+                <Button onClick={onStartAnalysis} variant="solid" className="mt-4 w-full sm:w-auto shadow-md">
                   <Play className="size-4 mr-2" /> Iniciar Analisis
                 </Button>
               )}

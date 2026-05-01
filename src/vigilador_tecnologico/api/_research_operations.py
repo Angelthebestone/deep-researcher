@@ -18,7 +18,7 @@ def research_requested_details(request: ResearchRequest) -> dict[str, Any]:
         "depth": request["depth"],
         "document_id": request["document_id"],
         "idempotency_key": request["idempotency_key"],
-        "stage_context": build_stage_context(
+        **build_stage_context(
             "ResearchRequested",
             model="serial-coordinator",
             breadth=request["breadth"],
@@ -61,6 +61,8 @@ def research_should_stream(event: dict[str, Any]) -> bool:
     return (isinstance(message, str) and message in RESEARCH_PROGRESS_EVENT_TYPES) or event.get("status") == "failed"
 
 
+import asyncio
+
 async def execute_research_operation(
     request: ResearchRequest,
     operation_id: str,
@@ -68,6 +70,7 @@ async def execute_research_operation(
     poll_interval_seconds: float = 0.1,
     custom_query: str | None = None,
     research_service: Any = None,
+    timeout_seconds: float = 300.0,
 ) -> None:
     """
     Ejecutar operación de investigación sin LangGraph.
@@ -84,6 +87,7 @@ async def execute_research_operation(
         poll_interval_seconds: Intervalo de polling (no usado en ejecución directa)
         custom_query: Query refinado (opcional)
         research_service: ResearchService inyectado (opcional, crea uno si None)
+        timeout_seconds: Timeout máximo para la investigación (default 5 min)
     """
     if research_service is None:
         from vigilador_tecnologico.services.research import ResearchService
@@ -94,18 +98,21 @@ async def execute_research_operation(
         journal.mark_running(
             operation_id,
             message=stage,
-            details={"stage_context": context},
+            details=context,
             event_key=stage.lower().replace("_", "-"),
         )
 
     completed = False
     try:
-        result = await research_service.execute_full_research(
-            target_technology=request["target_technology"],
-            query=custom_query or request["query"],
-            breadth=request["breadth"],
-            depth=request["depth"],
-            progress_callback=progress_callback,
+        result = await asyncio.wait_for(
+            research_service.execute_full_research(
+                target_technology=request["target_technology"],
+                query=custom_query or request["query"],
+                breadth=request["breadth"],
+                depth=request["depth"],
+                progress_callback=progress_callback,
+            ),
+            timeout=timeout_seconds,
         )
 
         journal.mark_running(
@@ -113,23 +120,38 @@ async def execute_research_operation(
             message="ReportGenerated",
             details={
                 "report": result.report,
-                "stage_context": result.stage_context,
+                **result.stage_context,
             },
             event_key="report-generated",
         )
-
 
         journal.mark_completed(
             operation_id,
             message="ResearchCompleted",
             details={
                 "report": result.report,
-                "stage_context": result.stage_context,
                 "branch_count": len(result.branch_results),
+                **result.stage_context,
             },
             event_key="research-completed",
         )
         completed = True
+
+    except asyncio.TimeoutError:
+        error_msg = f"Research timeout after {timeout_seconds}s"
+        journal.mark_failed(
+            operation_id,
+            error_msg,
+            details={
+                "error": error_msg,
+                "error_type": "TimeoutError",
+                **build_stage_context(
+                    "ResearchNodeEvaluated",
+                    failed_stage="research_timeout",
+                ),
+            },
+            event_key="research-failed:timeout",
+        )
 
     except Exception as error:
         error_text = str(error)

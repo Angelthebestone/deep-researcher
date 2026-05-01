@@ -3,11 +3,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { FileUp, LoaderCircle, Sparkles } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
+import { Chip } from "@nextui-org/react";
+import { Button } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, CardFooter } from "@nextui-org/react";
+import { Input } from "@nextui-org/react";
+import { Progress } from "@nextui-org/react";
 import { apiBaseUrl, uploadDocument } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { DocumentUploadResponse, SourceType } from "@/types/contracts";
@@ -113,19 +113,19 @@ export function DocumentIngest({ onUploaded, onUploadError, currentDocument, com
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <CardTitle className={cn("font-display", compact ? "text-lg" : "text-xl")}>Ingesta multimodal</CardTitle>
-            <CardDescription>
+            <h3 className={cn("font-display", compact ? "text-lg" : "text-xl")}>Ingesta multimodal</h3>
+            <p className="text-sm text-muted-foreground">
               {compact
                 ? "Carga un artefacto sin salir del flujo de chat."
                 : "Arrastra un PDF, imagen o documento y el agente preserva el mismo `document_id` para cada reintento."}
-            </CardDescription>
+            </p>
           </div>
-          <Badge variant={stageState.parsed ? "success" : "secondary"}>
+          <Chip color={stageState.parsed ? "success" : "secondary"} variant="flat" size="sm">
             {stageState.parsed ? "PARSED" : "UPLOADED"}
-          </Badge>
+          </Chip>
         </div>
       </CardHeader>
-      <CardContent className={cn("flex flex-col", compact ? "gap-3" : "gap-4")}>
+      <CardBody className={cn("flex flex-col", compact ? "gap-3" : "gap-4")}>
         <label
           className={cn(
             "group flex cursor-pointer flex-col items-center justify-center rounded-[2rem] border border-dashed border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(250,250,255,0.74))] px-6 text-center transition-all",
@@ -154,7 +154,7 @@ export function DocumentIngest({ onUploaded, onUploadError, currentDocument, com
             {SOURCE_TYPES.map((sourceType) => (
               <Button
                 key={sourceType}
-                variant={selectedSourceType === sourceType ? "default" : "outline"}
+                variant={selectedSourceType === sourceType ? "solid" : "bordered"}
                 size="sm"
                 onClick={(event) => {
                   event.preventDefault();
@@ -171,9 +171,9 @@ export function DocumentIngest({ onUploaded, onUploadError, currentDocument, com
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
           <Input value={selectedFileName} readOnly placeholder="No hay archivo seleccionado" className="bg-background/80" />
           <Button
-            variant="secondary"
+            color="secondary" variant="flat" size="sm"
             onClick={() => inputRef.current?.click()}
-            startIcon={uploading ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
+            startContent={uploading ? <LoaderCircle className="animate-spin size-4" /> : <Sparkles className="size-4" />}
           >
             {uploading ? "Procesando" : "Seleccionar"}
           </Button>
@@ -213,7 +213,7 @@ export function DocumentIngest({ onUploaded, onUploadError, currentDocument, com
             </p>
           </div>
         ) : null}
-      </CardContent>
+      </CardBody>
     </Card>
   );
 }

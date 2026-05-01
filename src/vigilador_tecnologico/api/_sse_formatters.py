@@ -17,6 +17,8 @@ def research_event_payload(event: dict[str, Any], *, sequence: int, request: Res
             stage_context = raw_stage_context
 
     event_type = event.get("message") or "ResearchEvent"
+    if event.get("status") == "failed":
+        event_type = "AnalysisFailed"
     operation_status = event.get("operation_status") or event.get("status") or "running"
 
     payload: dict[str, Any] = {

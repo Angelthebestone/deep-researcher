@@ -1,58 +1,125 @@
-<<<<<<< HEAD
 # AGENTS.md
 
-This repository builds a technology surveillance system. Start with [spec.md](spec.md), [.vscode/rules.md](.vscode/rules.md), and [README.md](README.md). Use [plan-techSurveillanceSystem.md](plan-techSurveillanceSystem.md) for roadmap context, but do not duplicate it here.
+Technology surveillance system. See [spec.md](spec.md) for full specification, [.vscode/rules.md](.vscode/rules.md) for implementation guardrails.
 
-## Working Rules
+## Quick Start
 
-- Treat [src/vigilador_tecnologico/contracts/models.py](src/vigilador_tecnologico/contracts/models.py) and [schemas/](schemas/) as the source of truth for data shapes.
-- Keep environment and secret access inside [src/vigilador_tecnologico/integrations/credentials.py](src/vigilador_tecnologico/integrations/credentials.py).
-- Route provider-specific calls through [src/vigilador_tecnologico/integrations/](src/vigilador_tecnologico/integrations/); services and workers should not hardcode SDK details or provider URLs.
-- Keep service outputs deterministic unless a model-backed path is explicitly documented.
-- Use LangGraph for research orchestration and FastAPI SSE for long-running progress.
-- Preserve document IDs, idempotency keys, and operation history across ingest, extraction, research, scoring, and reporting.
-- When a change adds or alters an event, endpoint, artifact, or contract field, update [spec.md](spec.md) and the affected schema files in the same change.
-- Prefer small, readable edits over abstractions. Check the implementation before assuming a future phase already exists.
+```bash
+# Backend (Python 3.13, .venv)
+pip install -e .
+start_all.bat                # Launches backend :8000 + frontend :3001
 
-## Validation
+# Backend without script (no --reload on Windows to avoid duplicate processes)
+.venv\Scripts\python.exe -m uvicorn vigilador_tecnologico.api.main:app --host 0.0.0.0 --port 8000
 
-- Install dependencies with `pip install -e .`.
-- Use `python -m unittest tests.test_live_e2e` for the end-to-end smoke path.
-- Use `python -m unittest tests.test_sse_stream` to validate SSE progress.
-- Use `python -m unittest tests.test_mistral_adapter` to validate the Mistral fallback path.
+# Frontend
+cd frontend && npm install && npm run dev -- --port 3001 --hostname 127.0.0.1
 
-## Current Gaps To Track
+# Docker
+docker compose up --build
+```
 
-- Research and scoring still need to preserve breadth/depth, visited URLs, summarized learnings, market alternatives, version gaps, source URLs, risk severity, and the Groq -> Mistral fallback history in the operation trail.
-- Reporting still needs a persisted, retrievable final artifact, a read/download endpoint, and a minimal dashboard that shows SSE progress, operation state, and the final report.
-- Operations still need notification-service plus basic health/readiness/logging/metrics before any final split into gateway, workers, and broker manifests.
-=======
-# AGENTS.md
+Always use `.venv\Scripts\python.exe` — never the global Python on Windows.
 
-This repository builds a technology surveillance system. Start with [spec.md](spec.md), [.vscode/rules.md](.vscode/rules.md), and [README.md](README.md). Use [plan-techSurveillanceSystem.md](plan-techSurveillanceSystem.md) for roadmap context, but do not duplicate it here.
+## Testing
 
-## Working Rules
+```bash
+# CI regression suite (matches .github/workflows/ci.yml)
+.venv\Scripts\python.exe -m unittest tests.test_document_upload tests.test_document_analyze tests.test_document_analyze_stream tests.test_schema_contract_alignment tests.test_sse_stream tests.test_research_fallback tests.test_normalization_reporting tests.test_ingestion_persistence -v
 
-- Treat [src/vigilador_tecnologico/contracts/models.py](src/vigilador_tecnologico/contracts/models.py) and [schemas/](schemas/) as the source of truth for data shapes.
-- Keep environment and secret access inside [src/vigilador_tecnologico/integrations/credentials.py](src/vigilador_tecnologico/integrations/credentials.py).
-- Route provider-specific calls through [src/vigilador_tecnologico/integrations/](src/vigilador_tecnologico/integrations/); services and workers should not hardcode SDK details or provider URLs.
-- Keep service outputs deterministic unless a model-backed path is explicitly documented.
-- Use LangGraph for research orchestration and FastAPI SSE for long-running progress.
-- Preserve document IDs, idempotency keys, and operation history across ingest, extraction, research, scoring, and reporting.
-- When a change adds or alters an event, endpoint, artifact, or contract field, update [spec.md](spec.md) and the affected schema files in the same change.
-- Prefer small, readable edits over abstractions. Check the implementation before assuming a future phase already exists.
+# Individual suites
+.venv\Scripts\python.exe -m unittest tests.test_live_e2e
+.venv\Scripts\python.exe -m unittest tests.test_sse_stream
+.venv\Scripts\python.exe -m unittest tests.test_mistral_adapter
+.venv\Scripts\python.exe -m unittest tests.test_operational_endpoints tests.test_document_analyze
 
-## Validation
+# Frontend
+cd frontend && npm run lint && npm run build
+```
 
-- Install dependencies with `pip install -e .`.
-- Use `python -m unittest tests.test_live_e2e` for the end-to-end smoke path.
-- Use `python -m unittest tests.test_sse_stream` to validate SSE progress.
-- Use `python -m unittest tests.test_mistral_adapter` to validate the Mistral fallback path.
+## Architecture
 
-## Current Gaps To Track
+**Pipeline:** Upload → Parse → Extract → Normalize → Research (LangGraph) → Score → Report
 
-- Research and scoring still need to preserve breadth/depth, visited URLs, summarized learnings, market alternatives, version gaps, source URLs, risk severity, and the Groq -> Mistral fallback history in the operation trail.
-- Reporting still needs a persisted, retrievable final artifact, a read/download endpoint, and a minimal dashboard that shows SSE progress, operation state, and the final report.
-- Operations still need notification-service plus basic health/readiness/logging/metrics before any final split into gateway, workers, and broker manifests.
->>>>>>> bd56fe3ed22eae2a676c5fb64e1f0c25e717dc87
-- Keep any future work in those areas aligned with [spec.md](spec.md) and the affected JSON Schemas.
+**Backend** (`src/vigilador_tecnologico/`):
+- `api/` — FastAPI HTTP entry, SSE routes. Routing in `sse_routes.py`, formatting in `_sse_formatters.py`, research state in `_research_operations.py`, DI via `AppDependencies` in `documents.py`
+- `contracts/models.py` — source of truth for all data shapes
+- `integrations/` — adapters (GeminiAdapter, GroqAdapter, MistralAdapter); `credentials.py` is the ONLY module that reads env/`.env`
+- `services/` — business logic; use `build_stage_context()` from `_stage_context.py` for all events, `*_with_context` API for orchestrator calls
+- `pipeline/` — LangGraph orchestration; nodes are thin wrappers, LLM logic lives in services
+- `workers/` — background executors (analysis, research)
+- `storage/` — disk-based repos under `.vigilador_data/`
+
+**Frontend** (`frontend/`): Next.js 14 App Router, React 18, Tailwind, HeroUI (NextUI v2), Zustand. Port 3001. See [frontend-styling.instructions.md](.github/instructions/frontend-styling.instructions.md).
+- **State management**: Zustand via `frontend/src/stores/appStore.ts`.
+- **UI Library**: HeroUI (NextUI v2) — all custom UI primitives in `components/ui/` were removed and replaced by HeroUI equivalents.
+- **Component structure**:
+  - `components/layout/` — AppShell, ViewToggle
+  - `components/chat/` — ChatView, ChatInputBar, MessageBubble, ThinkingTimeline
+  - `components/research/` — ResearchConsole
+  - `components/graph/` — GraphView
+- **Navigation**: Dual-view system (Chat | Graph) via floating toggle; DashboardWorkspace removed.
+- **Styling**: "Zen-Data" aesthetic — minimal, non-boxy, white/smoke background with purple and lime accents.
+- **Dependencies added**: `zustand`, `react-markdown`, `remark-gfm`.
+- **Build verification**: `npm run build` passes successfully.
+
+**JSON Schemas** (`schemas/*.schema.json`) — contract truth alongside `contracts/models.py`.
+
+## Boundaries (enforced)
+
+| Boundary | Rule |
+|----------|------|
+| Credentials | Only `integrations/credentials.py` reads env/`.env` |
+| Adapters | All provider calls through `integrations/` — no hardcoded SDK details in services |
+| Contracts | Services normalize to `contracts/models.py` types before returning |
+| Determinism | Outputs deterministic unless explicitly model-backed and documented |
+| Spec sync | Changing behavior/contracts → update `spec.md` and affected schemas in the same commit |
+
+## Key Rules (non-obvious)
+
+- **No comments** in code unless explicitly requested.
+- **LangGraph only** for research state — no manual loops or recursion.
+- **Terminal operations are not reusable** — `find_by_idempotency_key()` must return `None` for completed/failed ops.
+- **Chat SSE emits the same envelope** as `analyze/stream`. Terminal failures always use `AnalysisFailed`.
+- **`report_markdown`** for research output; **`report_artifact`** for document reports — never overload a single `report` field.
+- **`build_stage_context()`** required for all SSE events — no manual context dicts.
+- **Prompt engineering** is tool-free and deterministic; `fallback_reason` must surface when model degrades.
+- **Chat flow order**: `PromptImprovementStarted → PromptImproved → ResearchRequested → ResearchPlanCreated`. Never emit `ResearchRequested` before `PromptImproved`.
+- **Idempotency**: document analysis derives key from document; chat generates per-attempt key from frontend.
+- **Frontend deduplicates** SSE by `event_id` and hydrates from Supabase (`localStorage` fallback). Don't re-open `EventSource` on re-render.
+
+## Environment Variables
+
+**Backend** (`.env`):
+- `GEMINI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`
+
+**Frontend** (`frontend/.env.local`):
+- `NEXT_PUBLIC_API_BASE_URL` — defaults to `http://127.0.0.1:8000`
+- `BACKEND_API_BASE_URL` — internal rewrite target, defaults to `http://127.0.0.1:8000`
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — optional snapshot persistence
+
+## Ports
+
+- Backend: `8000`
+- Frontend: `3001` (not 3000 — `start_all.ps1` uses 3001)
+
+## MCP Servers (opencode)
+
+Configured in `~/.config/opencode/opencode.jsonc`. Use these tools in prompts:
+
+| MCP | Usage | Prompt keyword |
+|-----|-------|----------------|
+| **vercel** | Deployments, logs, env vars, docs search | `use vercel` |
+| **lucide** | Search Lucide icons by name, get JSX/SVG | `use lucide` |
+| **context7** | Library docs (Shadcn/UI, Tailwind, HeroUI, etc.) | `use context7` |
+| **fetch** | Fetch any URL as markdown/HTML/text | `use fetch` |
+
+**Vercel MCP**: Remote at `https://mcp.vercel.com` with OAuth. First use opens browser for login.
+
+**Context7 MCP**: Remote at `https://mcp.context7.com/mcp`. Free, no API key. Use for component examples, API refs, theming docs.
+
+**Lucide MCP**: Local via `npx -y lucide-icons-mcp`. Search icons and get import paths for `lucide-react`.
+
+**Fetch MCP**: Local via `npx -y mcp-fetch-server`. Generic URL fetching for arbitrary documentation.
+
+Example: When building UI components, add `use context7` to get Shadcn/UI docs, or `use lucide` to find icons.

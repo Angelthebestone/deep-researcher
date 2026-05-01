@@ -12,10 +12,10 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
+import { Chip } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, CardFooter } from "@nextui-org/react";
+import { Progress } from "@nextui-org/react";
+import { Divider } from "@nextui-org/react";
 import {
   createAnalyzeStreamUrl,
   createChatStreamUrl,
@@ -489,17 +489,19 @@ export function AnalysisStream({
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <CardTitle className="font-display text-xl">Rastro de razonamiento</CardTitle>
-            <CardDescription>Progressive SSE para la taxonomia completa del analisis y Deep Research.</CardDescription>
+            <h3 className="font-display text-xl">Rastro de razonamiento</h3>
+            <p className="text-sm text-muted-foreground">Progressive SSE para la taxonomia completa del analisis y Deep Research.</p>
           </div>
-          <Badge
-            variant={status === "live" || status === "complete" ? "success" : status === "connecting" ? "secondary" : "outline"}
+          <Chip
+            color={status === "live" || status === "complete" ? "success" : status === "connecting" ? "secondary" : "default"}
+            variant={status === "live" || status === "complete" ? "flat" : status === "connecting" ? "flat" : "bordered"}
+            size="sm"
           >
             {status}
-          </Badge>
+          </Chip>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardBody className="flex flex-col gap-4">
         <div className="rounded-[1.75rem] border border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(250,250,255,0.82))] p-4">
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -507,7 +509,7 @@ export function AnalysisStream({
                 <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Estado actual</div>
                 <div className="font-medium text-foreground">{message}</div>
               </div>
-              {fallbackLabel ? <Badge variant="outline">{fallbackLabel}</Badge> : <Badge variant="secondary">Sin fallback</Badge>}
+              {fallbackLabel ? <Chip variant="bordered" size="sm">{fallbackLabel}</Chip> : <Chip color="secondary" variant="flat" size="sm">Sin fallback</Chip>}
             </div>
             <Progress value={progress} />
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -549,7 +551,7 @@ export function AnalysisStream({
           </div>
         </div>
 
-        <Separator />
+        <Divider />
 
         <div className="flex flex-col gap-3">
           {visibleEvents.length ? (
@@ -583,7 +585,7 @@ export function AnalysisStream({
                       ) : null}
                     </div>
                   </div>
-                  <Badge variant={stageTone(event.event_type) === "success" ? "success" : "secondary"}>#{event.sequence}</Badge>
+                  <Chip color={stageTone(event.event_type) === "success" ? "success" : "secondary"} variant="flat" size="sm">#{event.sequence}</Chip>
                 </div>
                 <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
                   <div>Node: {typeof event.details?.node_name === "string" ? event.details.node_name : "n/a"}</div>
@@ -602,7 +604,7 @@ export function AnalysisStream({
             </div>
           )}
         </div>
-      </CardContent>
+      </CardBody>
     </Card>
   );
 }
