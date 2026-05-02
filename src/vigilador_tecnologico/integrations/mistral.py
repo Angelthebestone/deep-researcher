@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from json import dumps, loads
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
+from vigilador_tecnologico.integrations._http_client import async_request_json
 from vigilador_tecnologico.integrations.credentials import get_mistral_key
 
 
@@ -41,7 +39,7 @@ class MistralAdapter:
 			"Authorization": f"Bearer {self._require_api_key()}",
 		}
 
-	def chat_completions(
+	async def chat_completions(
 		self,
 		messages: list[dict[str, Any]],
 		*,
@@ -72,9 +70,9 @@ class MistralAdapter:
 			payload["response_format"] = response_format
 		if parallel_tool_calls is not None:
 			payload["parallel_tool_calls"] = parallel_tool_calls
-		return self._request_json(self.chat_completions_url, payload, timeout)
+		return await async_request_json(self.chat_completions_url, payload, self.build_headers(), timeout, MistralAdapterError, "Mistral")
 
-	def conversations_start(
+	async def conversations_start(
 		self,
 		inputs: list[dict[str, Any]] | str,
 		*,
@@ -118,9 +116,9 @@ class MistralAdapter:
 			payload["name"] = name
 		if metadata is not None:
 			payload["metadata"] = metadata
-		return self._request_json(self.conversations_url, payload, timeout)
+		return await async_request_json(self.conversations_url, payload, self.build_headers(), timeout, MistralAdapterError, "Mistral")
 
-	def agents_create(
+	async def agents_create(
 		self,
 		*,
 		model: str,
@@ -146,7 +144,7 @@ class MistralAdapter:
 			payload["tools"] = tools
 		if metadata is not None:
 			payload["metadata"] = metadata
-		return self._request_json(self.agents_url, payload, timeout)
+		return await async_request_json(self.agents_url, payload, self.build_headers(), timeout, MistralAdapterError, "Mistral")
 
 	def _require_api_key(self) -> str:
 		if not self.api_key:
@@ -155,23 +153,7 @@ class MistralAdapter:
 			raise MistralAdapterError("Missing Mistral API key.")
 		return self.api_key
 
-	def _request_json(self, url: str, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
-		request = Request(
-			url,
-			data=dumps(payload).encode("utf-8"),
-			headers=self.build_headers(),
-			method="POST",
-		)
-		try:
-			with urlopen(request, timeout=timeout) as response:
-				return loads(response.read().decode("utf-8"))
-		except HTTPError as error:
-			details = error.read().decode("utf-8", errors="ignore")
-			raise MistralAdapterError(
-				f"Mistral request failed with HTTP {error.code}: {details or error.reason}"
-			) from error
-		except URLError as error:
-			raise MistralAdapterError(f"Mistral request failed: {error.reason}") from error
+
 
 
 __all__ = ["MistralAdapter", "MistralAdapterError"]

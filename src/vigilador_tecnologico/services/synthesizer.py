@@ -10,7 +10,7 @@ from vigilador_tecnologico.integrations.model_profiles import (
     GEMINI_3_FLASH_MODEL,
     GEMINI_3_SYNTHESIZER_SYSTEM_INSTRUCTION,
 )
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
 from ._llm_response import extract_response_text
 from ._stage_context import build_stage_context
 
@@ -22,7 +22,7 @@ class SynthesizerService:
     retry_attempts: int = 1
     retry_delay_seconds: float = 1.0
 
-    def synthesize_plan_results(
+    async def synthesize_plan_results(
         self,
         target_technology: str,
         plan: ResearchPlan,
@@ -31,7 +31,7 @@ class SynthesizerService:
         adapter = self._get_adapter()
         started_at = perf_counter()
         prompt = self._build_prompt(target_technology, plan, branch_results)
-        response = call_with_retry(
+        response = await async_call_with_retry(
             adapter.generate_content,
             prompt,
             attempts=self.retry_attempts,
@@ -53,7 +53,7 @@ class SynthesizerService:
             duration_ms=int((perf_counter() - started_at) * 1000),
         )
 
-    def synthesize_learnings(self, target_technology: str, learnings: list[str]) -> tuple[str, dict[str, Any]]:
+    async def synthesize_learnings(self, target_technology: str, learnings: list[str]) -> tuple[str, dict[str, Any]]:
         synthetic_plan: ResearchPlan = {
             "plan_id": "legacy-plan",
             "query": target_technology,
@@ -77,7 +77,7 @@ class SynthesizerService:
                 "embeddings": [],
             }
         ]
-        return self.synthesize_plan_results(target_technology, synthetic_plan, branch_results)
+        return await self.synthesize_plan_results(target_technology, synthetic_plan, branch_results)
 
     def _build_prompt(
         self,

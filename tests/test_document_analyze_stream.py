@@ -36,7 +36,7 @@ class _FakeExtractionService:
         self.calls = 0
         self.model = GEMMA_4_26B_MODEL
 
-    def extract_with_context(self, document_id: str, source_type: str, source_uri: str, raw_text: str):
+    async def extract_with_context(self, document_id: str, source_type: str, source_uri: str, raw_text: str):
         self.calls += 1
         return [
             {
@@ -95,7 +95,7 @@ class _FakeNormalizationService:
         self.calls = 0
         self.model = GEMMA_4_26B_MODEL
 
-    def normalize_with_context(self, mentions):
+    async def normalize_with_context(self, mentions):
         self.calls += 1
         return mentions, {"stage": "TechnologiesNormalized", "model": "fake"}
 
@@ -106,7 +106,7 @@ class _FakeResearchService:
         self.progress_calls = 0
         self.model = GEMINI_WEB_SEARCH_MODEL
 
-    def research(
+    async def research(
         self,
         technology_names: list[str],
         *,
@@ -202,7 +202,7 @@ class DocumentAnalyzeStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payloads[4]["stage_context"]["model"], GEMINI_WEB_SEARCH_MODEL)
         self.assertEqual(payloads[-1]["stage_context"]["stage"], "ReportGenerated")
         self.assertEqual(payloads[-1]["stage_context"]["model"], "local")
-        self.assertTrue(payloads[-1]["report_artifact"]["metadata"]["technology_count"] >= 2)
+        self.assertTrue(payloads[-1]["report"]["metadata"]["technology_count"] >= 2)
 
         operation_id = payloads[0]["operation_id"]
         operation_record = self.operation_journal.load(operation_id)
@@ -225,7 +225,7 @@ class DocumentAnalyzeStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
         report_response = self.client.get(f"/api/v1/documents/{document_id}/report")
         self.assertEqual(report_response.status_code, 200)
-        self.assertEqual(report_response.json()["report_id"], payloads[-1]["report_artifact"]["report_id"])
+        self.assertEqual(report_response.json()["report_id"], payloads[-1]["report"]["report_id"])
 
     async def test_timeout_extraction_falls_back_and_reaches_research(self) -> None:
         class _TimeoutGeminiAdapter:
@@ -287,16 +287,14 @@ class DocumentAnalyzeStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(payload["event_type"], "AnalysisFailed")
-        self.assertEqual(payload["failed_stage"], "TechnologiesExtracted")
+        self.assertEqual(payload["stage_context"]["failed_stage"], "TechnologiesExtracted")
         self.assertEqual(payload["stage_context"]["model"], GEMMA_4_26B_MODEL)
 
-    def test_parse_stage_failure_is_recorded_with_failed_stage_context(self) -> None:
+    async def test_parse_stage_failure_is_recorded_with_failed_stage_context(self) -> None:
         stored_document = self.storage.save("source.txt", b"browser debug sample", "text")
-        self.storage.save_status(stored_document.document_id, "UPLOADED")
         operation = self.operation_journal.enqueue(
             "analysis",
             stored_document.document_id,
-            idempotency_key="analysis-parse-failure",
             details={"document_id": stored_document.document_id},
         )
         self.operation_journal.mark_running(
@@ -306,7 +304,7 @@ class DocumentAnalyzeStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch.object(documents_module, "_load_or_parse", side_effect=TimeoutError("The read operation timed out")):
-            documents_module._execute_analysis_operation(stored_document, str(operation["operation_id"]))
+            await documents_module._execute_analysis_operation(stored_document, str(operation["operation_id"]))
 
         failed_record = self.operation_journal.load(str(operation["operation_id"]))
         self.assertEqual(failed_record["status"], "failed")

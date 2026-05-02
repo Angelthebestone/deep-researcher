@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from json import dumps, loads
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
+from vigilador_tecnologico.integrations._http_client import async_request_json
 from vigilador_tecnologico.integrations.credentials import get_gemini_key
 
 
@@ -37,7 +35,7 @@ class GeminiAdapter:
 			"x-goog-api-key": self._require_api_key(),
 		}
 
-	def generate_content(
+	async def generate_content(
 		self,
 		prompt: str,
 		*,
@@ -55,9 +53,9 @@ class GeminiAdapter:
 			payload["generationConfig"] = generation_config
 		if tools:
 			payload["tools"] = tools
-		return self._request_json(self.generate_content_url, payload, timeout)
+		return await async_request_json(self.generate_content_url, payload, self.build_headers(), timeout, GeminiAdapterError, "Gemini")
 
-	def generate_content_parts(
+	async def generate_content_parts(
 		self,
 		parts: list[dict[str, Any]],
 		*,
@@ -75,11 +73,11 @@ class GeminiAdapter:
 			payload["generationConfig"] = generation_config
 		if tools:
 			payload["tools"] = tools
-		return self._request_json(self.generate_content_url, payload, timeout)
+		return await async_request_json(self.generate_content_url, payload, self.build_headers(), timeout, GeminiAdapterError, "Gemini")
 
-	def embed_content(self, text: str, *, timeout: float = 30.0) -> dict[str, Any]:
+	async def embed_content(self, text: str, *, timeout: float = 30.0) -> dict[str, Any]:
 		payload: dict[str, Any] = {"content": {"parts": [{"text": text}]}}
-		return self._request_json(self.embed_content_url, payload, timeout)
+		return await async_request_json(self.embed_content_url, payload, self.build_headers(), timeout, GeminiAdapterError, "Gemini")
 
 	def _require_api_key(self) -> str:
 		if not self.api_key:
@@ -88,27 +86,7 @@ class GeminiAdapter:
 			raise GeminiAdapterError("Missing Gemini API key.")
 		return self.api_key
 
-	def _request_json(self, url: str, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
-		request = Request(
-			url,
-			data=dumps(payload).encode("utf-8"),
-			headers=self.build_headers(),
-			method="POST",
-		)
-		try:
-			with urlopen(request, timeout=timeout) as response:
-				return loads(response.read().decode("utf-8"))
-		except HTTPError as error:
-			details = error.read().decode("utf-8", errors="ignore")
-			raise GeminiAdapterError(
-				f"Gemini request failed with HTTP {error.code}: {details or error.reason}"
-			) from error
-		except URLError as error:
-			raise GeminiAdapterError(f"Gemini request failed: {error.reason}") from error
-		except TimeoutError as error:
-			raise GeminiAdapterError(f"Gemini request timed out: {error}") from error
-		except OSError as error:
-			raise GeminiAdapterError(f"Gemini transport failed: {error}") from error
+
 
 
 __all__ = ["GeminiAdapter", "GeminiAdapterError"]

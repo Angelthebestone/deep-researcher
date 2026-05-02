@@ -14,25 +14,16 @@ import {
   Clock,
 } from "lucide-react";
 import { Chip } from "@nextui-org/react";
-import { useAppStore } from "@/stores/appStore";
-
-interface TimelineEvent {
-  event_id: string;
-  event_type: string;
-  operation_id?: string;
-  sequence?: number;
-  details?: any;
-  stage_context?: any;
-  message?: string;
-  report?: any;
-}
+import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
+import type { AnalysisStreamEvent } from "@/types/contracts";
 
 export function ThinkingTimeline() {
   const [expanded, setExpanded] = useState(false);
-  const events = useAppStore((state) => state.events);
-  const currentOperation = useAppStore((state) => state.currentOperation);
+  const workspace = useActiveWorkspace();
+  const events = workspace?.events ?? [];
+  const currentOperation = workspace?.currentOperation ?? null;
 
-  const filtered: TimelineEvent[] = events.filter(
+  const filtered = events.filter(
     (e) => e.operation_id === currentOperation?.operation_id
   );
 
@@ -60,7 +51,7 @@ export function ThinkingTimeline() {
     return <Brain className="size-4 text-muted-foreground" />;
   };
 
-  const getStageIcon = (event: TimelineEvent) => {
+  const getStageIcon = (event: AnalysisStreamEvent) => {
     const type = event.event_type;
     if (type === "ResearchCompleted" || type === "ReportGenerated") {
       return <CheckCircle2 className="size-4 text-success" />;
@@ -75,8 +66,9 @@ export function ThinkingTimeline() {
       return <FileText className="size-4 text-muted-foreground" />;
     }
     if (type === "ResearchNodeEvaluated") {
+      const details = event.details || {};
       return getModelIcon(
-        event.details?.provider || event.details?.model
+        (details.provider as string | undefined) || (details.model as string | undefined)
       );
     }
     return <Brain className="size-4 text-muted-foreground" />;
@@ -86,7 +78,7 @@ export function ThinkingTimeline() {
     <div className="inline-flex flex-col items-start">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded-full bg-white/40 border border-border/20 backdrop-blur-sm"
+        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded-full bg-background/40 border border-border/20 backdrop-blur-sm"
       >
         <span>{label}</span>
         {!isDone && (
@@ -107,15 +99,15 @@ export function ThinkingTimeline() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="mt-2 bg-white/60 backdrop-blur-sm rounded-lg border border-border/30 p-2 max-h-64 overflow-y-auto w-80">
+            <div className="mt-2 bg-background/60 backdrop-blur-sm rounded-lg border border-border/30 p-2 max-h-64 overflow-y-auto w-80">
               <div className="space-y-2">
                 {sorted.map((event) => {
                   const type = event.event_type;
                   const isLast = lastEvent?.event_id === event.event_id;
                   const active = isLast && !isTerminal(type);
                   const details = event.details || {};
-                  const duration = details?.duration_ms;
-                  const fallback = details?.fallback_reason;
+                  const duration = details.duration_ms as number | undefined;
+                  const fallback = details.fallback_reason as string | undefined;
 
                   return (
                     <motion.div
@@ -123,7 +115,7 @@ export function ThinkingTimeline() {
                       initial={{ opacity: 0, x: -5 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.15 }}
-                      className="flex items-start gap-2 border-l border-primary/20 pl-2 py-1 bg-white/40 rounded-md"
+                      className="flex items-start gap-2 border-l border-primary/20 pl-2 py-1 bg-background/40 rounded-md"
                     >
                       <div className="mt-0.5 shrink-0">
                         {active ? (
@@ -171,16 +163,16 @@ export function ThinkingTimeline() {
 
                         {type === "PromptImproved" && (
                           <div className="space-y-0.5">
-                            {details?.refined_query && (
-                              <div className="bg-white/60 rounded px-1.5 py-0.5 text-[10px] text-foreground/80 font-mono break-words">
-                                {details.refined_query}
+                            {(details.refined_query as string | undefined) && (
+                              <div className="bg-background/60 rounded px-1.5 py-0.5 text-[10px] text-foreground/80 font-mono break-words">
+                                {details.refined_query as string}
                               </div>
                             )}
-                            {Array.isArray(details?.keywords) &&
-                              details.keywords.length > 0 && (
+                            {Array.isArray(details.keywords) &&
+                              (details.keywords as unknown[]).length > 0 && (
                                 <div className="flex flex-wrap gap-1">
-                                  {details.keywords.map(
-                                    (k: string, i: number) => (
+                                  {(details.keywords as string[]).map(
+                                    (k, i) => (
                                       <Chip
                                         key={i}
                                         size="sm"
@@ -200,13 +192,13 @@ export function ThinkingTimeline() {
                           <div className="space-y-0.5">
                             <div className="text-[10px] text-foreground/80">
                               Investigando:{" "}
-                              {details?.target_technology || event.message}
+                              {(details.target_technology as string | undefined) || event.message}
                             </div>
-                            {(details?.breadth !== undefined || details?.depth !== undefined) && (
+                            {((details.breadth as number | undefined) !== undefined || (details.depth as number | undefined) !== undefined) && (
                               <div className="text-[9px] text-muted-foreground/60">
-                                {details?.breadth !== undefined && `breadth ${details.breadth}`}
-                                {details?.breadth !== undefined && details?.depth !== undefined && " · "}
-                                {details?.depth !== undefined && `depth ${details.depth}`}
+                                {(details.breadth as number | undefined) !== undefined && `amplitud ${details.breadth as number}`}
+                                {(details.breadth as number | undefined) !== undefined && (details.depth as number | undefined) !== undefined && " · "}
+                                {(details.depth as number | undefined) !== undefined && `profundidad ${details.depth as number}`}
                               </div>
                             )}
                           </div>
@@ -214,20 +206,20 @@ export function ThinkingTimeline() {
 
                         {type === "ResearchPlanCreated" && (
                           <div className="space-y-0.5">
-                            {details?.plan_summary && (
+                            {(details.plan_summary as string | undefined) && (
                               <div className="text-[10px] text-foreground/70 line-clamp-1">
-                                {details.plan_summary}
+                                {details.plan_summary as string}
                               </div>
                             )}
-                            {(details?.branch_count !== undefined ||
-                              details?.branches?.length !== undefined) && (
+                            {((details.branch_count as number | undefined) !== undefined ||
+                              (Array.isArray(details.branches) && (details.branches as unknown[]).length !== undefined)) && (
                               <Chip
                                 size="sm"
                                 variant="flat"
                                 className="text-[9px] h-4 px-1"
                               >
-                                {details?.branch_count ??
-                                  details?.branches?.length}{" "}
+                                {(details.branch_count as number | undefined) ??
+                                  (details.branches as unknown[]).length}{" "}
                                 ramas
                               </Chip>
                             )}
@@ -238,19 +230,19 @@ export function ThinkingTimeline() {
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1 text-[10px] text-foreground/80">
                               {getModelIcon(
-                                details?.provider || details?.model
+                                (details.provider as string | undefined) || (details.model as string | undefined)
                               )}
                               <span className="capitalize">
-                                {details?.provider ||
-                                  details?.model ||
+                                {(details.provider as string | undefined) ||
+                                  (details.model as string | undefined) ||
                                   "Modelo"}
                               </span>
                             </div>
-                            {Array.isArray(details?.executed_queries) &&
-                              details.executed_queries.length > 0 && (
+                            {Array.isArray(details.executed_queries) &&
+                              (details.executed_queries as unknown[]).length > 0 && (
                                 <div className="flex flex-wrap gap-1">
-                                  {details.executed_queries.map(
-                                    (q: string, i: number) => (
+                                  {(details.executed_queries as string[]).map(
+                                    (q, i) => (
                                       <Chip
                                         key={i}
                                         size="sm"
@@ -263,12 +255,12 @@ export function ThinkingTimeline() {
                                   )}
                                 </div>
                               )}
-                            {Array.isArray(details?.source_urls) &&
-                              details.source_urls.length > 0 && (
+                            {Array.isArray(details.source_urls) &&
+                              (details.source_urls as unknown[]).length > 0 && (
                                 <div className="space-y-0.5">
-                                  {details.source_urls
+                                  {(details.source_urls as string[])
                                     .slice(0, 3)
-                                    .map((url: string, i: number) => (
+                                    .map((url, i) => (
                                       <a
                                         key={i}
                                         href={url}
@@ -282,18 +274,18 @@ export function ThinkingTimeline() {
                                         </span>
                                       </a>
                                     ))}
-                                  {details.source_urls.length > 3 && (
+                                  {(details.source_urls as string[]).length > 3 && (
                                     <span className="text-[9px] text-muted-foreground">
-                                      +{details.source_urls.length - 3} more
+                                      +{(details.source_urls as string[]).length - 3} más
                                     </span>
                                   )}
                                 </div>
                               )}
-                            {Array.isArray(details?.learnings_preview) &&
-                              details.learnings_preview.length > 0 && (
+                            {Array.isArray(details.learnings_preview) &&
+                              (details.learnings_preview as unknown[]).length > 0 && (
                                 <div className="space-y-0.5">
-                                  {details.learnings_preview.map(
-                                    (l: string, i: number) => (
+                                  {(details.learnings_preview as string[]).map(
+                                    (l, i) => (
                                       <div
                                         key={i}
                                         className="text-[10px] text-foreground/70 line-clamp-2"
@@ -304,13 +296,13 @@ export function ThinkingTimeline() {
                                   )}
                                 </div>
                               )}
-                            {details?.learnings_count !== undefined && (
+                            {(details.learnings_count as number | undefined) !== undefined && (
                               <Chip
                                 size="sm"
                                 variant="flat"
                                 className="text-[9px] h-4 px-1"
                               >
-                                {details.learnings_count} aprendizajes
+                                {details.learnings_count as number} aprendizajes
                               </Chip>
                             )}
                           </div>
@@ -320,8 +312,9 @@ export function ThinkingTimeline() {
                           type === "ResearchCompleted") && (
                           <div className="space-y-0.5">
                             {(() => {
-                              const report =
-                                details?.report || event.report;
+                              const reportRaw =
+                                (details.report as string | undefined) || event.report;
+                              const report = typeof reportRaw === "string" ? reportRaw : null;
                               if (!report) return null;
                               return (
                                 <>
@@ -338,13 +331,13 @@ export function ThinkingTimeline() {
                               );
                             })()}
                             {type === "ResearchCompleted" &&
-                              details?.branch_count !== undefined && (
+                              (details.branch_count as number | undefined) !== undefined && (
                                 <Chip
                                   size="sm"
                                   variant="flat"
                                   className="text-[9px] h-4 px-1"
                                 >
-                                  {details.branch_count} ramas
+                                  {details.branch_count as number} ramas
                                 </Chip>
                               )}
                           </div>

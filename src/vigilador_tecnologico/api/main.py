@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from vigilador_tecnologico.api.documents import router as documents_router
 from vigilador_tecnologico.api.operations import router as operations_router
 from vigilador_tecnologico.api.sse_routes import router as sse_router
+from vigilador_tecnologico.api.workspaces import router as workspaces_router
 from vigilador_tecnologico.storage.service import StorageService, default_storage_root
 
 
@@ -38,6 +39,7 @@ app.add_middleware(
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(operations_router, prefix="/api/v1")
 app.include_router(sse_router, prefix="/api/v1")
+app.include_router(workspaces_router, prefix="/api/v1")
 
 
 @app.get("/dashboard/{document_id}", response_class=HTMLResponse)

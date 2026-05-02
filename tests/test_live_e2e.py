@@ -82,7 +82,7 @@ class LiveEndToEndSmokeTest(unittest.IsolatedAsyncioTestCase):
 			}
 		]
 		async def normalize_mentions():
-			return await asyncio.to_thread(normalization_service.normalize, mentions)
+			return await normalization_service.normalize(mentions)
 
 		normalized = await self._run_with_retry(normalize_mentions)
 		self.assertEqual(len(normalized), 1)

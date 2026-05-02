@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import re
 import uuid
 from dataclasses import dataclass
@@ -19,7 +20,7 @@ from vigilador_tecnologico.integrations.model_profiles import (
     MISTRAL_REVIEW_MODEL,
     MISTRAL_WEB_SEARCH_MODEL,
 )
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
 from ._llm_response import parse_json_response
 from ._fallback import FallbackReason
 from ._stage_context import build_stage_context
@@ -33,7 +34,7 @@ class PlanningService:
     retry_attempts: int = 1
     retry_delay_seconds: float = 1.0
 
-    def create_research_plan(
+    async def create_research_plan(
         self,
         target_technology: str,
         research_brief: str,
@@ -42,20 +43,23 @@ class PlanningService:
     ) -> tuple[ResearchPlan, dict[str, Any]]:
         adapter = self._get_adapter()
         started_at = perf_counter()
+        current_year = datetime.datetime.now().year
         prompt = (
             f"Target technology: {target_technology}\n"
             f"Refined research brief: {research_brief}\n"
             f"Breadth budget: {breadth}\n"
             f"Depth budget: {depth}\n\n"
-            "Create a serial research plan with two query sets and return plain text only.\n"
+            f"Focus on developments from {current_year} and 2025-2026.\n"
+            "Create a serial research plan with three query sets and return plain text only.\n"
             "Use these labels exactly:\n"
             "Plan summary:\n"
-            "Gemini queries:\n"
-            "Mistral queries:\n"
+            "Branch A queries:\n"
+            "Branch B queries:\n"
+            "Branch C queries:\n"
             "Write one query per line or separate them with semicolons."
         )
         try:
-            response = call_with_retry(
+            response = await async_call_with_retry(
                 adapter.generate_content,
                 prompt,
                 attempts=self.retry_attempts,
@@ -103,48 +107,28 @@ class PlanningService:
     ) -> ResearchPlan:
         payload = self._parse_plan_payload(response)
         plan_summary = self._text_value(payload.get("plan_summary"))
-        gemini_queries = self._normalize_queries(payload.get("gemini_queries"), breadth=breadth)
-        mistral_queries = self._normalize_queries(payload.get("mistral_queries"), breadth=breadth)
+        branch_a_queries = self._normalize_queries(payload.get("branch_a_queries"), breadth=breadth)
+        branch_b_queries = self._normalize_queries(payload.get("branch_b_queries"), breadth=breadth)
+        branch_c_queries = self._normalize_queries(payload.get("branch_c_queries"), breadth=breadth)
         if not plan_summary:
             raise ValueError("Research planner response did not include plan_summary.")
-        if not gemini_queries:
-            raise ValueError("Research planner response did not include valid gemini_queries.")
-        if not mistral_queries:
-            raise ValueError("Research planner response did not include valid mistral_queries.")
+        if not branch_a_queries:
+            raise ValueError("Research planner response did not include valid branch_a_queries.")
+        if not branch_b_queries:
+            raise ValueError("Research planner response did not include valid branch_b_queries.")
+        if not branch_c_queries:
+            raise ValueError("Research planner response did not include valid branch_c_queries.")
 
-        branches: list[ResearchPlanBranch] = [
-            {
-                "branch_id": "gemini-grounded",
-                "provider": "gemini_grounded",
-                "objective": f"Ground the brief with verified web evidence for {target_technology}.",
-                "queries": gemini_queries,
-                "max_iterations": depth,
-                "search_model": GEMINI_WEB_SEARCH_MODEL,
-                "review_model": GEMMA_4_26B_MODEL,
-                "embedding_model": GEMINI_EMBEDDING_MODEL,
-            },
-            {
-                "branch_id": "mistral-web",
-                "provider": "mistral_web_search",
-                "objective": f"Cross-check the same brief with a second web-search lane for {target_technology}.",
-                "queries": mistral_queries,
-                "max_iterations": depth,
-                "search_model": MISTRAL_WEB_SEARCH_MODEL,
-                "review_model": MISTRAL_REVIEW_MODEL,
-                "embedding_model": GEMINI_EMBEDDING_MODEL,
-            },
-        ]
-        return {
-            "plan_id": uuid.uuid4().hex,
-            "query": research_brief,
-            "target_technology": target_technology,
-            "breadth": breadth,
-            "depth": depth,
-            "execution_mode": "serial",
-            "plan_summary": plan_summary,
-            "branches": branches,
-            "consolidation_model": GEMINI_3_FLASH_MODEL,
-        }
+        return self._build_research_plan(
+            target_technology=target_technology,
+            research_brief=research_brief,
+            plan_summary=plan_summary,
+            branch_a_queries=branch_a_queries,
+            branch_b_queries=branch_b_queries,
+            branch_c_queries=branch_c_queries,
+            breadth=breadth,
+            depth=depth,
+        )
 
     def _parse_plan_payload(self, response: dict[str, Any]) -> dict[str, Any]:
         text = self._text_value(response.get("text"))
@@ -159,8 +143,9 @@ class PlanningService:
         current_key: str | None = None
         sections = {
             "plan summary": "plan_summary",
-            "gemini queries": "gemini_queries",
-            "mistral queries": "mistral_queries",
+            "branch a queries": "branch_a_queries",
+            "branch b queries": "branch_b_queries",
+            "branch c queries": "branch_c_queries",
         }
         for raw_line in text.splitlines():
             line = raw_line.strip()
@@ -180,7 +165,7 @@ class PlanningService:
             if current_key is not None:
                 parsed[current_key] = f"{parsed.get(current_key, '')}\n{line}".strip()
 
-        if "gemini_queries" not in parsed or "mistral_queries" not in parsed or "plan_summary" not in parsed:
+        if "branch_a_queries" not in parsed or "branch_b_queries" not in parsed or "branch_c_queries" not in parsed or "plan_summary" not in parsed:
             try:
                 payload = parse_json_response(
                     response,
@@ -196,8 +181,9 @@ class PlanningService:
 
         return {
             "plan_summary": parsed["plan_summary"],
-            "gemini_queries": self._split_plan_queries(parsed["gemini_queries"]),
-            "mistral_queries": self._split_plan_queries(parsed["mistral_queries"]),
+            "branch_a_queries": self._split_plan_queries(parsed["branch_a_queries"]),
+            "branch_b_queries": self._split_plan_queries(parsed["branch_b_queries"]),
+            "branch_c_queries": self._split_plan_queries(parsed["branch_c_queries"]),
         }
 
     def _normalize_queries(self, value: Any, *, breadth: int) -> list[str]:
@@ -241,14 +227,41 @@ class PlanningService:
         breadth: int,
         depth: int,
     ) -> ResearchPlan:
-        gemini_queries = self._seed_queries(target_technology, research_brief, "gemini", breadth)
-        mistral_queries = self._seed_queries(target_technology, research_brief, "mistral", breadth)
+        branch_a_queries = self._seed_queries(target_technology, research_brief, "technical", breadth)
+        branch_b_queries = self._seed_queries(target_technology, research_brief, "commercial", breadth)
+        branch_c_queries = self._seed_queries(target_technology, research_brief, "risk", breadth)
+        return self._build_research_plan(
+            target_technology=target_technology,
+            research_brief=research_brief,
+            plan_summary=(
+                f"Serial research plan for {target_technology} with technical, commercial, and risk branches. "
+                "Fallback plan generated locally because the planner model did not return a usable response."
+            ),
+            branch_a_queries=branch_a_queries,
+            branch_b_queries=branch_b_queries,
+            branch_c_queries=branch_c_queries,
+            breadth=breadth,
+            depth=depth,
+        )
+
+    def _build_research_plan(
+        self,
+        *,
+        target_technology: str,
+        research_brief: str,
+        plan_summary: str,
+        branch_a_queries: list[str],
+        branch_b_queries: list[str],
+        branch_c_queries: list[str],
+        breadth: int,
+        depth: int,
+    ) -> ResearchPlan:
         branches: list[ResearchPlanBranch] = [
             {
                 "branch_id": "gemini-grounded",
                 "provider": "gemini_grounded",
-                "objective": f"Ground the brief with verified web evidence for {target_technology}.",
-                "queries": gemini_queries,
+                "objective": "Technical deep-dive",
+                "queries": branch_a_queries,
                 "max_iterations": depth,
                 "search_model": GEMINI_WEB_SEARCH_MODEL,
                 "review_model": GEMMA_4_26B_MODEL,
@@ -257,11 +270,21 @@ class PlanningService:
             {
                 "branch_id": "mistral-web",
                 "provider": "mistral_web_search",
-                "objective": f"Cross-check the same brief with a second web-search lane for {target_technology}.",
-                "queries": mistral_queries,
+                "objective": "Commercial landscape",
+                "queries": branch_b_queries,
                 "max_iterations": depth,
                 "search_model": MISTRAL_WEB_SEARCH_MODEL,
                 "review_model": MISTRAL_REVIEW_MODEL,
+                "embedding_model": GEMINI_EMBEDDING_MODEL,
+            },
+            {
+                "branch_id": "openrouter-risk",
+                "provider": "openrouter_search",
+                "objective": "Risk analysis and alternatives",
+                "queries": branch_c_queries,
+                "max_iterations": depth,
+                "search_model": "openrouter",
+                "review_model": "openrouter",
                 "embedding_model": GEMINI_EMBEDDING_MODEL,
             },
         ]
@@ -272,23 +295,39 @@ class PlanningService:
             "breadth": breadth,
             "depth": depth,
             "execution_mode": "serial",
-            "plan_summary": (
-                f"Serial research plan for {target_technology} with Gemini and Mistral lanes. "
-                "Fallback plan generated locally because the planner model did not return a usable response."
-            ),
+            "plan_summary": plan_summary,
             "branches": branches,
             "consolidation_model": GEMINI_3_FLASH_MODEL,
         }
 
-    def _seed_queries(self, target_technology: str, research_brief: str, lane: str, breadth: int) -> list[str]:
+    def _seed_queries(self, target_technology: str, research_brief: str, branch_type: str, breadth: int) -> list[str]:
         base_query = " ".join(research_brief.split()) or target_technology
-        lane_hint = "grounded web evidence" if lane == "gemini" else "cross-checking web evidence"
-        seeds = [
-            f"{base_query} {lane_hint}",
-            f"{target_technology} technical architecture {lane_hint}",
-            f"{target_technology} commercial adoption {lane_hint}",
-            f"{target_technology} risks and limitations {lane_hint}",
-        ]
+        if branch_type == "technical":
+            seeds = [
+                f"{base_query} architecture and standards",
+                f"{target_technology} technical specifications",
+                f"{target_technology} benchmarks and performance",
+                f"{target_technology} architecture and design patterns",
+            ]
+        elif branch_type == "commercial":
+            seeds = [
+                f"{base_query} adoption and use cases",
+                f"{target_technology} pricing and licensing",
+                f"{target_technology} vendors and market share",
+                f"{target_technology} commercial adoption trends",
+            ]
+        elif branch_type == "risk":
+            seeds = [
+                f"{base_query} CVEs and security issues",
+                f"{target_technology} deprecation and obsolescence",
+                f"{target_technology} alternatives and replacements",
+                f"{target_technology} roadmap and future developments",
+            ]
+        else:
+            seeds = [
+                f"{base_query}",
+                f"{target_technology} overview",
+            ]
         cleaned: list[str] = []
         seen: set[str] = set()
         for seed in seeds:
@@ -302,7 +341,7 @@ class PlanningService:
             cleaned.append(query)
             if len(cleaned) >= max(1, breadth):
                 break
-        return cleaned or [f"{target_technology} {lane_hint}"]
+        return cleaned or [f"{target_technology} {branch_type}"]
 
     def _is_valid_query(self, query: str) -> bool:
         return is_valid_query(query)

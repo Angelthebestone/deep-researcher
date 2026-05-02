@@ -30,7 +30,7 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
             def __init__(self) -> None:
                 self.calls = []
 
-            def extract(self, document_id: str, source_type: str, source_uri: str, raw_text: str):
+            async def extract(self, document_id: str, source_type: str, source_uri: str, raw_text: str):
                 self.calls.append((document_id, source_type, source_uri, raw_text))
                 return [
                     {
@@ -85,7 +85,7 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
 
     def test_document_status_tracks_upload_and_extraction(self) -> None:
         class FakeExtractionService:
-            def extract(self, document_id: str, source_type: str, source_uri: str, raw_text: str):
+            async def extract(self, document_id: str, source_type: str, source_uri: str, raw_text: str):
                 return [
                     {
                         "mention_id": f"{document_id}:mention:1",
@@ -149,7 +149,7 @@ class DocumentUploadIntegrationTest(unittest.TestCase):
             def __init__(self) -> None:
                 self.calls = 0
 
-            def extract(self, document_id: str, source_type: str, source_uri: str, raw_text: str):
+            async def extract(self, document_id: str, source_type: str, source_uri: str, raw_text: str):
                 self.calls += 1
                 return [
                     {

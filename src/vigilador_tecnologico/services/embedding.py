@@ -11,7 +11,16 @@ from vigilador_tecnologico.integrations.model_profiles import (
     GEMINI_EMBEDDING_MODEL,
     GEMINI_EMBEDDING_TIMEOUT_SECONDS,
 )
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
+
+
+# Gemini Embedding 2 limit: 8192 tokens.
+# Heuristic: 1 token ≈ 4 chars for English/Spanish.
+# We reserve 700 tokens for metadata (task prefix, technology name, query).
+_MAX_EMBEDDING_TOKENS = 7500
+_TOKEN_TO_CHAR_RATIO = 4
+_MAX_EMBEDDING_CHARS = _MAX_EMBEDDING_TOKENS * _TOKEN_TO_CHAR_RATIO
+_METADATA_RESERVE_CHARS = 700 * _TOKEN_TO_CHAR_RATIO
 
 
 @dataclass(slots=True)
@@ -20,7 +29,7 @@ class EmbeddingService:
     model: str = GEMINI_EMBEDDING_MODEL
     similarity_threshold: float = 0.82
 
-    def embed_iteration(
+    async def embed_iteration(
         self,
         *,
         branch_id: str,
@@ -36,7 +45,7 @@ class EmbeddingService:
             query=query,
             learnings=learnings,
         )
-        response = call_with_retry(
+        response = await async_call_with_retry(
             adapter.embed_content,
             source_text,
             attempts=1,
@@ -61,7 +70,30 @@ class EmbeddingService:
         }
 
     def _source_text(self, *, target_technology: str, query: str, learnings: list[str]) -> str:
-        learnings_text = " | ".join(learning.strip() for learning in learnings if learning.strip())
+        """Build embedding input text. Truncates learnings to stay within token budget."""
+        meta_chars = len("task: clustering | query: technology=; query=; learnings=")
+        meta_chars += len(target_technology) + len(query)
+        budget = _MAX_EMBEDDING_CHARS - meta_chars
+        if budget < 500:
+            budget = 500
+
+        cleaned = [learning.strip() for learning in learnings if learning.strip()]
+        parts: list[str] = []
+        used = 0
+        separator = " | "
+        for learning in cleaned:
+            needed = len(learning) if not parts else len(separator) + len(learning)
+            if used + needed > budget:
+                remaining = budget - used - len(" [...truncated]")
+                if remaining > 20 and not parts:
+                    parts.append(learning[:remaining] + " [...truncated]")
+                elif remaining > 20:
+                    parts[-1] = parts[-1][:remaining] + " [...truncated]"
+                break
+            parts.append(learning)
+            used += len(learning) if not parts else len(separator) + len(learning)
+
+        learnings_text = separator.join(parts)
         return (
             "task: clustering | query: "
             f"technology={target_technology}; query={query}; learnings={learnings_text}"

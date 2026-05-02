@@ -3,14 +3,18 @@ import { motion } from "framer-motion";
 import { Chip, Button } from "@nextui-org/react";
 
 import { useAppStore } from "@/stores/appStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 
 export function ResearchConsole() {
   const isConsoleOpen = useAppStore((s) => s.isConsoleOpen);
-  const researchParams = useAppStore((s) => s.researchParams);
-  const currentOperation = useAppStore((s) => s.currentOperation);
   const setConsoleOpen = useAppStore((s) => s.setConsoleOpen);
-  const setResearchParam = useAppStore((s) => s.setResearchParam);
-  const resetSession = useAppStore((s) => s.resetSession);
+
+  const workspace = useActiveWorkspace();
+  const researchParams = workspace?.researchParams ?? { depth: 2, breadth: 3, contextFiles: [] };
+  const currentOperation = workspace?.currentOperation ?? null;
+  const setResearchParam = useWorkspaceStore((s) => s.setResearchParam);
+  const resetSession = useWorkspaceStore((s) => s.resetSession);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +47,7 @@ export function ResearchConsole() {
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed right-0 top-0 h-full w-80 z-40 backdrop-blur-xl bg-white/70 border-l border-border/20 shadow-[-20px_0_60px_rgba(0,0,0,0.04)]"
+      className="fixed right-0 top-0 h-full w-80 z-40 backdrop-blur-xl bg-background/70 backdrop-blur-md border-l border-border/20 shadow-[-20px_0_60px_rgba(0,0,0,0.04)]"
     >
       <div className="p-6 space-y-8">
         <div className="flex items-center justify-between">
@@ -111,7 +115,7 @@ export function ResearchConsole() {
           <span className="text-sm font-medium text-foreground">Contexto</span>
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="h-[50px] flex items-center justify-center border border-dashed border-border rounded-xl cursor-pointer hover:bg-white/50 transition-colors"
+            className="h-[50px] flex items-center justify-center border border-dashed border-border rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
           >
             <span className="text-xs text-muted-foreground">
               Arrastra archivos de contexto
@@ -139,7 +143,7 @@ export function ResearchConsole() {
 
         <div className="space-y-3">
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Idempotency Key
+            Clave de idempotencia
           </span>
           <p className="text-[10px] font-mono text-muted-foreground break-all">
             {currentOperation?.idempotency_key ?? "—"}

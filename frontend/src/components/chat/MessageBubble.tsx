@@ -5,7 +5,7 @@ import { FileText } from "lucide-react";
 import { Chip } from "@nextui-org/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage } from "@/stores/appStore";
+import type { ChatMessage } from "@/types/chat";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -20,7 +20,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         transition={{ duration: 0.3 }}
         className="flex justify-end"
       >
-        <div className="bg-lime-50 text-lime-900 rounded-lg px-4 py-2">
+        <div className="bg-lime-500/10 text-lime-700 dark:text-lime-300 rounded-lg px-4 py-2">
           <p className="text-sm leading-relaxed">{message.content}</p>
         </div>
       </motion.div>
@@ -35,7 +35,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         transition={{ duration: 0.3 }}
         className="flex justify-start gap-2"
       >
-        <div className="prose prose-sm max-w-none prose-headings:text-lime-700 prose-a:text-lime-600 text-foreground">
+        <div className="prose prose-sm max-w-none prose-headings:text-lime-700 dark:prose-headings:text-lime-300 prose-a:text-lime-600 dark:prose-a:text-lime-400 text-foreground">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
         </div>
       </motion.div>
@@ -90,9 +90,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         transition={{ duration: 0.3 }}
         className="flex justify-start w-full"
       >
-        <div className="w-full bg-white/50 rounded-lg p-4">
+        <div className="w-full bg-muted/30 rounded-lg p-4">
           <p className="text-xs text-muted-foreground mb-2">Reporte de investigacion</p>
-          <div className="prose prose-sm max-w-none prose-headings:text-lime-700 prose-a:text-lime-600 text-foreground">
+        <div className="prose prose-sm max-w-none prose-headings:text-lime-700 dark:prose-headings:text-lime-300 prose-a:text-lime-600 dark:prose-a:text-lime-400 text-foreground">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
           </div>
         </div>

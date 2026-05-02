@@ -54,6 +54,30 @@ def get_mistral_key(required: bool = True) -> str | None:
 	return get_secret("MISTRAL_API_KEY", required=required)
 
 
+def get_openrouter_key(required: bool = True) -> str | None:
+	return get_secret("OPENROUTER_API_KEY", required=required)
+
+
+def get_nvidia_key(required: bool = True) -> str | None:
+	return get_secret("NVIDIA_API_KEY", required=required)
+
+
+def get_huggingface_key(required: bool = True) -> str | None:
+	return get_secret("HUGGINGFACE_API_KEY", required=required)
+
+
+def get_tavily_key(required: bool = True) -> str | None:
+	return get_secret("TAVILY_API_KEY", required=required)
+
+
+def get_exa_key(required: bool = True) -> str | None:
+	return get_secret("EXA_API_KEY", required=required)
+
+
+def get_serper_key(required: bool = True) -> str | None:
+	return get_secret("SERPER_API_KEY", required=required)
+
+
 def _resolve_dotenv_path(path: str | Path | None) -> Path | None:
 	if path is not None:
 		candidate = Path(path).expanduser()

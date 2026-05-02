@@ -1,55 +1,62 @@
 "use client";
 
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
-import { Button, Textarea } from "@nextui-org/react";
-import { Paperclip, Send, SlidersHorizontal } from "lucide-react";
+import { Button, Textarea, ButtonGroup } from "@nextui-org/react";
+import {
+  Paperclip,
+  Send,
+  SlidersHorizontal,
+  RefreshCw,
+  PanelRight,
+  PanelRightClose,
+} from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { startAnalysis, uploadDocument } from "@/lib/api";
-import type { ChatMessage } from "@/stores/appStore";
-import type { SourceType } from "@/types/contracts";
+import { sourceTypeFromFilename, toBase64 } from "@/lib/files";
+import type { ChatMessage } from "@/types/chat";
+
+type ChatMode =
+  | "investigación"
+  | "comparador"
+  | "validación"
+  | "costo-beneficio";
+
+const MODES: { key: ChatMode; label: string }[] = [
+  { key: "investigación", label: "Investigación" },
+  { key: "comparador", label: "Comparador" },
+  { key: "validación", label: "Validación" },
+  { key: "costo-beneficio", label: "Costo/Beneficio" },
+];
 
 interface ChatInputBarProps {
   onStartStream?: (query: string, idempotencyKey: string) => void;
+  panelOpen?: boolean;
+  onTogglePanel?: () => void;
 }
 
-function sourceTypeFromFilename(filename: string): SourceType {
-  const extension = filename.split(".").pop()?.toLowerCase() ?? "";
-  if (extension === "pdf") return "pdf";
-  if (["png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff", "webp"].includes(extension)) return "image";
-  if (extension === "docx") return "docx";
-  if (extension === "pptx") return "pptx";
-  if (["xlsx", "xlsm", "csv", "tsv"].includes(extension)) return "sheet";
-  return "text";
-}
-
-function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const value = typeof reader.result === "string" ? reader.result : "";
-      const index = value.indexOf(",");
-      resolve(index >= 0 ? value.slice(index + 1) : value);
-    };
-    reader.onerror = () => reject(new Error("No se pudo leer el archivo."));
-    reader.readAsDataURL(file);
-  });
-}
-
-export function ChatInputBar({ onStartStream }: ChatInputBarProps) {
+export function ChatInputBar({
+  onStartStream,
+  panelOpen,
+  onTogglePanel,
+}: ChatInputBarProps) {
   const [value, setValue] = useState("");
   const [uploading, setUploading] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [mode, setMode] = useState<ChatMode>("investigación");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const addChatMessage = useAppStore((state) => state.addChatMessage);
+  const workspace = useActiveWorkspace();
+  const addChatMessage = useWorkspaceStore((state) => state.addChatMessage);
   const setConsoleOpen = useAppStore((state) => state.setConsoleOpen);
   const isConsoleOpen = useAppStore((state) => state.isConsoleOpen);
-  const setCurrentDocument = useAppStore((state) => state.setCurrentDocument);
-  const setIsAnalyzing = useAppStore((state) => state.setIsAnalyzing);
+  const setCurrentDocument = useWorkspaceStore((state) => state.setCurrentDocument);
+  const setIsAnalyzing = useWorkspaceStore((state) => state.setIsAnalyzing);
 
   const handleSend = () => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || !workspace) return;
 
     const message: ChatMessage = {
       id: crypto.randomUUID(),
@@ -84,7 +91,7 @@ export function ChatInputBar({ onStartStream }: ChatInputBarProps) {
   const handleFileChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (!file || uploading) return;
+      if (!file || uploading || !workspace) return;
 
       setUploading(true);
       setNotification(null);
@@ -125,12 +132,54 @@ export function ChatInputBar({ onStartStream }: ChatInputBarProps) {
         }
       }
     },
-    [addChatMessage, setCurrentDocument, setIsAnalyzing, uploading],
+    [addChatMessage, setCurrentDocument, setIsAnalyzing, uploading, workspace],
   );
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 z-40">
-      <div className="bg-white/60 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.04)] flex items-end gap-2 p-2">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 z-40 space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <ButtonGroup size="sm" variant="light">
+          {MODES.map((m) => (
+            <Button
+              key={m.key}
+              variant={mode === m.key ? "solid" : "light"}
+              color={mode === m.key ? "primary" : "default"}
+              size="sm"
+              onPress={() => setMode(m.key)}
+              className="text-xs"
+            >
+              {m.label}
+            </Button>
+          ))}
+        </ButtonGroup>
+
+        <div className="flex items-center gap-1">
+          <Button
+            isIconOnly
+            variant="light"
+            size="sm"
+            onPress={() => console.log("Actualizar vigilancia")}
+            aria-label="Actualizar vigilancia"
+          >
+            <RefreshCw className="size-4 text-muted-foreground" />
+          </Button>
+          <Button
+            isIconOnly
+            variant="light"
+            size="sm"
+            onPress={onTogglePanel}
+            aria-label="Alternar panel contextual"
+          >
+            {panelOpen ? (
+              <PanelRightClose className="size-4 text-primary" />
+            ) : (
+              <PanelRight className="size-4 text-muted-foreground" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-background/60 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.04)] flex items-end gap-2 p-2">
         <Button
           isIconOnly
           variant="light"
@@ -138,6 +187,7 @@ export function ChatInputBar({ onStartStream }: ChatInputBarProps) {
           isLoading={uploading}
           onPress={() => fileInputRef.current?.click()}
           className="pb-1"
+          aria-label="Adjuntar archivo"
         >
           <Paperclip className="size-4 text-muted-foreground" />
         </Button>
@@ -169,6 +219,7 @@ export function ChatInputBar({ onStartStream }: ChatInputBarProps) {
             variant="light"
             size="sm"
             onPress={() => setConsoleOpen(!isConsoleOpen)}
+            aria-label="Alternar consola de investigación"
           >
             <SlidersHorizontal className="size-4 text-muted-foreground" />
           </Button>
@@ -177,6 +228,7 @@ export function ChatInputBar({ onStartStream }: ChatInputBarProps) {
             variant="light"
             size="sm"
             onPress={handleSend}
+            aria-label="Enviar mensaje"
           >
             <Send className="size-4 text-primary" />
           </Button>

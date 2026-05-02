@@ -98,8 +98,7 @@ class ResearchWorker:
                 if not source_urls:
                     raise ValueError(f"Research analysis for '{normalized_query}' returned no source URLs.")
 
-                embedding = await asyncio.to_thread(
-                    self._get_embedding_service().embed_iteration,
+                embedding = await self._get_embedding_service().embed_iteration(
                     branch_id=branch["branch_id"],
                     iteration=iteration_count,
                     query=normalized_query,

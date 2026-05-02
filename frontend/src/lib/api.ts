@@ -136,6 +136,65 @@ export async function readReportMarkdown(documentId: string): Promise<string> {
   return text;
 }
 
+export async function exportDocument(
+  documentId: string,
+  format: "json" | "csv" | "markdown",
+): Promise<Blob> {
+  const url = new URL(buildUrl(`/api/v1/documents/${encodeURIComponent(documentId)}/export`));
+  url.searchParams.set("format", format);
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Export failed with status ${response.status}`);
+  }
+  return response.blob();
+}
+
+export interface WorkspacePayload {
+  workspace_id: string;
+  name: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  data: Record<string, unknown>;
+}
+
+export async function createWorkspaceOnBackend(name: string, status?: string): Promise<WorkspacePayload> {
+  const response = await fetch(buildUrl("/api/v1/workspaces"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, status }),
+  });
+  return readJson<WorkspacePayload>(response);
+}
+
+export async function listWorkspacesOnBackend(): Promise<WorkspacePayload[]> {
+  const response = await fetch(buildUrl("/api/v1/workspaces"));
+  return readJson<WorkspacePayload[]>(response);
+}
+
+export async function updateWorkspaceOnBackend(
+  workspaceId: string,
+  patch: { name?: string; status?: string; data?: Record<string, unknown> },
+): Promise<WorkspacePayload> {
+  const response = await fetch(buildUrl(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}`), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return readJson<WorkspacePayload>(response);
+}
+
+export async function deleteWorkspaceOnBackend(workspaceId: string): Promise<void> {
+  const response = await fetch(buildUrl(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}`), {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Delete failed with status ${response.status}`);
+  }
+}
+
 export function normalizeDetails(details: unknown): JsonValue {
   if (!details || typeof details !== "object" || Array.isArray(details)) {
     return {};

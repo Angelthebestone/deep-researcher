@@ -11,7 +11,7 @@ from typing import Any, cast
 from vigilador_tecnologico.contracts.models import EvidenceSpan, SourceType, TechnologyCategory, TechnologyMention
 from vigilador_tecnologico.integrations import GeminiAdapter
 from vigilador_tecnologico.integrations.model_profiles import GEMMA_4_26B_MODEL
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
 from ._fallback import (
     LOCAL_FALLBACK_EMPTY_REASON,
     LOCAL_FALLBACK_INVALID_REASON,
@@ -100,11 +100,11 @@ class ExtractionService:
     timeout_seconds: float = 30.0
 
 
-    def extract(self, document_id: str, source_type: str, source_uri: str, raw_text: str) -> list[TechnologyMention]:
-        mentions, _ = self.extract_with_context(document_id, source_type, source_uri, raw_text)
+    async def extract(self, document_id: str, source_type: str, source_uri: str, raw_text: str) -> list[TechnologyMention]:
+        mentions, _ = await self.extract_with_context(document_id, source_type, source_uri, raw_text)
         return mentions
 
-    def extract_with_context(
+    async def extract_with_context(
         self,
         document_id: str,
         source_type: str,
@@ -122,7 +122,7 @@ class ExtractionService:
 
         started_at = perf_counter()
         try:
-            response = call_with_retry(
+            response = await async_call_with_retry(
                 adapter.generate_content,
                 self._build_prompt(document_id, source_type, source_uri, cleaned_text),
                 attempts=self.retry_attempts,
@@ -569,5 +569,5 @@ class ExtractionService:
             return default
 
 
-def extract_technologies(document_id: str, source_type: str, source_uri: str, raw_text: str) -> list[TechnologyMention]:
-    return ExtractionService().extract(document_id, source_type, source_uri, raw_text)
+async def extract_technologies(document_id: str, source_type: str, source_uri: str, raw_text: str) -> list[TechnologyMention]:
+    return await ExtractionService().extract(document_id, source_type, source_uri, raw_text)

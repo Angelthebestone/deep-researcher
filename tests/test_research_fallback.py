@@ -12,7 +12,7 @@ class _FailingGeminiAdapter:
     def __init__(self) -> None:
         self.calls = 0
 
-    def generate_content(self, prompt, **kwargs):
+    async def generate_content(self, prompt, **kwargs):
         self.calls += 1
         raise GeminiAdapterError("simulated gemini failure")
 
@@ -21,7 +21,7 @@ class _SuccessfulMistralAdapter:
     def __init__(self) -> None:
         self.calls = 0
 
-    def chat_completions(self, messages, **kwargs):
+    async def chat_completions(self, messages, **kwargs):
         self.calls += 1
         return {
             "choices": [
@@ -48,7 +48,7 @@ class _CapturingGeminiAdapter:
         self.calls = 0
         self.last_kwargs: dict[str, object] = {}
 
-    def generate_content(self, prompt, **kwargs):
+    async def generate_content(self, prompt, **kwargs):
         self.calls += 1
         self.last_kwargs = kwargs
         payload = {
@@ -74,8 +74,8 @@ class _CapturingGeminiAdapter:
         }
 
 
-class ResearchFallbackTest(unittest.TestCase):
-    def test_service_falls_back_to_mistral_deterministically(self) -> None:
+class ResearchFallbackTest(unittest.IsolatedAsyncioTestCase):
+    async def test_service_falls_back_to_mistral_deterministically(self) -> None:
         gemini_adapter = _FailingGeminiAdapter()
         mistral_adapter = _SuccessfulMistralAdapter()
         service = ResearchService(
@@ -85,8 +85,8 @@ class ResearchFallbackTest(unittest.TestCase):
             retry_delay_seconds=0.0,
         )
 
-        first_result = service.research(["FastAPI"])[0]
-        second_result = service.research(["FastAPI"])[0]
+        first_result = (await service.research(["FastAPI"]))[0]
+        second_result = (await service.research(["FastAPI"]))[0]
 
         first_snapshot = {
             "technology_name": first_result["technology_name"],
@@ -122,11 +122,11 @@ class ResearchFallbackTest(unittest.TestCase):
         self.assertEqual(gemini_adapter.calls, 2)
         self.assertEqual(mistral_adapter.calls, 2)
 
-    def test_service_uses_google_search_tools_with_gemma_model(self) -> None:
+    async def test_service_uses_google_search_tools_with_gemma_model(self) -> None:
         gemini_adapter = _CapturingGeminiAdapter()
         service = ResearchService(adapter=gemini_adapter, model=GEMMA_4_26B_MODEL)
 
-        result = service.research(["FastAPI"])
+        result = await service.research(["FastAPI"])
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["technology_name"], "FastAPI")

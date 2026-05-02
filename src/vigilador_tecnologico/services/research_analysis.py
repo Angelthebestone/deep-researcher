@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,7 +12,7 @@ from vigilador_tecnologico.integrations.model_profiles import (
     MISTRAL_REVIEW_SYSTEM_INSTRUCTION,
     MISTRAL_REVIEW_TIMEOUT_SECONDS,
 )
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
 from ._llm_response import parse_json_response
 from ._text_utils import coerce_text, deduplicate_text_list, normalize_urls
 
@@ -66,7 +65,7 @@ class ResearchAnalysisService:
                     accumulated_learnings=accumulated_learnings,
                 )
                 return self._ensure_minimum_analysis_payload(result, search_output)
-        if branch["provider"] == "mistral_web_search":
+        if branch["provider"] in ("mistral_web_search", "openrouter_search"):
             result = await self._analyze_with_mistral_review(
                 branch,
                 query=query,
@@ -103,8 +102,7 @@ class ResearchAnalysisService:
             "Known source URLs:\n"
             + "\n".join(f"- {url}" for url in source_urls)
         )
-        response = await asyncio.to_thread(
-            call_with_retry,
+        response = await async_call_with_retry(
             self.gemma_adapter.generate_content,
             prompt,
             attempts=self.retry_attempts,
@@ -151,8 +149,7 @@ class ResearchAnalysisService:
                 ),
             },
         ]
-        response = await asyncio.to_thread(
-            call_with_retry,
+        response = await async_call_with_retry(
             self.mistral_review_adapter.conversations_start,
             inputs,
             attempts=self.retry_attempts,

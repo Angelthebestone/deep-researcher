@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from datetime import datetime
 from typing import Any
 
 from vigilador_tecnologico.integrations.gemini import GeminiAdapter
@@ -10,7 +11,7 @@ from vigilador_tecnologico.integrations.model_profiles import (
     GEMMA_4_PROMPT_ENGINEERING_SYSTEM_INSTRUCTION,
     GEMMA_4_PROMPT_ENGINEERING_TIMEOUT_SECONDS,
 )
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
 from ._llm_response import extract_response_text, parse_json_response
 
 class PromptEngineeringService:
@@ -19,20 +20,24 @@ class PromptEngineeringService:
         self.adapter = GeminiAdapter(model=self.model)
 
     async def improve_query(self, raw_query: str) -> dict[str, Any]:
+        prompt_with_time = (
+            f"Current year: {datetime.now().year}. "
+            "Ensure research focuses on current and recent developments, not historical data before 2023.\n\n"
+            f"{raw_query}"
+        )
         try:
             response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    call_with_retry,
-                self.adapter.generate_content_parts,
-                [{"text": raw_query}],
-                attempts=1,
-                system_instruction=GEMMA_4_PROMPT_ENGINEERING_SYSTEM_INSTRUCTION,
-                generation_config={
-                    "temperature": 0.2,
-                },
-                timeout=GEMMA_4_PROMPT_ENGINEERING_TIMEOUT_SECONDS,
-            ),
-            timeout=GEMMA_4_PROMPT_ENGINEERING_TIMEOUT_SECONDS + 1.0,
+                async_call_with_retry(
+                    self.adapter.generate_content_parts,
+                    [{"text": prompt_with_time}],
+                    attempts=1,
+                    system_instruction=GEMMA_4_PROMPT_ENGINEERING_SYSTEM_INSTRUCTION,
+                    generation_config={
+                        "temperature": 0.2,
+                    },
+                    timeout=GEMMA_4_PROMPT_ENGINEERING_TIMEOUT_SECONDS,
+                ),
+                timeout=GEMMA_4_PROMPT_ENGINEERING_TIMEOUT_SECONDS + 1.0,
             )
         except Exception:
             return self._deterministic_fallback(raw_query, fallback_reason="provider_failure")
@@ -112,10 +117,11 @@ class PromptEngineeringService:
 
     def _deterministic_fallback(self, raw_query: str, *, fallback_reason: str) -> dict[str, Any]:
         normalized_query = " ".join(raw_query.strip().split()) or "Technology Research"
+        current_year = datetime.now().year
         refined_query = (
             f"Analyze {normalized_query} as a technology surveillance brief. "
-            "Focus on technical principles, operating constraints, commercial adoption, "
-            "vendors, risks, comparative alternatives, and recent developments."
+            f"Focus on the current state in {current_year}, recent developments from {current_year-1} to {current_year+1}, "
+            "technical principles, operating constraints, commercial adoption, vendors, risks, comparative alternatives."
         )
         keywords = self._build_fallback_keywords(normalized_query)
         return {
@@ -128,8 +134,12 @@ class PromptEngineeringService:
         }
 
     def _build_fallback_keywords(self, normalized_query: str) -> list[str]:
+        current_year = datetime.now().year
         seed_terms = [
             normalized_query,
+            f"{current_year} developments",
+            "recent advances",
+            "current state",
             "technical principles",
             "commercial adoption",
             "vendor landscape",

@@ -71,7 +71,7 @@ class PipelineOrchestrator:
         self.scoring_service = scoring_service or ScoringService()
         self.reporting_service = reporting_service or ReportingService()
 
-    def run_document(
+    async def run_document(
         self,
         *,
         stored_document: StoredDocument,
@@ -80,7 +80,7 @@ class PipelineOrchestrator:
         storage_service: StorageService,
         record_event: EventRecorder | None = None,
     ) -> PipelineResult:
-        mentions, extraction_context = self._extract_mentions(
+        mentions, extraction_context = await self._extract_mentions(
             stored_document=stored_document,
             parsed_document=parsed_document,
         )
@@ -98,7 +98,7 @@ class PipelineOrchestrator:
             node_name="extraction-worker",
         )
 
-        normalized_mentions, normalization_context = self._normalize_mentions(mentions)
+        normalized_mentions, normalization_context = await self._normalize_mentions(mentions)
         storage_service.mentions.save_normalized(stored_document.document_id, [dict(mention) for mention in normalized_mentions])
         document_storage.save_status(stored_document.document_id, "NORMALIZED")
         self._record(
@@ -134,7 +134,7 @@ class PipelineOrchestrator:
         )
         research_started_at = perf_counter()
         try:
-            research_results = self._call_research_service(
+            research_results = await self._call_research_service(
                 technology_names,
                 progress_callback=self._build_research_progress_callback(
                     storage_service,
@@ -246,7 +246,7 @@ class PipelineOrchestrator:
             report_id=report_id,
         )
 
-    def _extract_mentions(
+    async def _extract_mentions(
         self,
         *,
         stored_document: StoredDocument,
@@ -254,7 +254,7 @@ class PipelineOrchestrator:
     ) -> tuple[list[TechnologyMention], dict[str, object]]:
         started_at = perf_counter()
         try:
-            mentions, stage_context = self.extraction_service.extract_with_context(
+            mentions, stage_context = await self.extraction_service.extract_with_context(
                 stored_document.document_id,
                 parsed_document.source_type,
                 parsed_document.source_uri,
@@ -273,10 +273,10 @@ class PipelineOrchestrator:
                 ),
             ) from error
 
-    def _normalize_mentions(self, mentions: list[TechnologyMention]) -> tuple[list[TechnologyMention], dict[str, object]]:
+    async def _normalize_mentions(self, mentions: list[TechnologyMention]) -> tuple[list[TechnologyMention], dict[str, object]]:
         started_at = perf_counter()
         try:
-            normalized_mentions, stage_context = self.normalization_service.normalize_with_context(mentions)
+            normalized_mentions, stage_context = await self.normalization_service.normalize_with_context(mentions)
             return normalized_mentions, self._merge_service_model(stage_context, self.normalization_service)
         except Exception as error:
             raise PipelineStageError(
@@ -290,9 +290,9 @@ class PipelineOrchestrator:
                 ),
             ) from error
 
-    def run(self, mentions: list[TechnologyMention]) -> PipelineResult:
-        normalized_mentions = self.normalization_service.normalize(mentions)
-        research_results = self.research_service.research(self._technology_names(normalized_mentions))
+    async def run(self, mentions: list[TechnologyMention]) -> PipelineResult:
+        normalized_mentions = await self.normalization_service.normalize(mentions)
+        research_results = await self.research_service.research(self._technology_names(normalized_mentions))
         comparisons, risks, recommendations = self.scoring_service.score(normalized_mentions, research_results)
         source_items: list[SourceItem] = []
         report = self.reporting_service.build_report(
@@ -384,13 +384,13 @@ class PipelineOrchestrator:
         if record_event is not None:
             record_event(event_type, details, node_name)
 
-    def _call_research_service(
+    async def _call_research_service(
         self,
         technology_names: list[str],
         *,
         progress_callback: Callable[[TechnologyResearch, int, int], None] | None = None,
     ) -> list[TechnologyResearch]:
-        return self.research_service.research(
+        return await self.research_service.research(
             technology_names,
             breadth=self.document_research_breadth,
             depth=self.document_research_depth,

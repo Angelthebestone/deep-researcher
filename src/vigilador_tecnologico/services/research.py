@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import perf_counter
@@ -17,18 +18,17 @@ from vigilador_tecnologico.contracts.models import (
 )
 from vigilador_tecnologico.integrations import GeminiAdapter, MistralAdapter
 from vigilador_tecnologico.integrations.model_profiles import GEMINI_WEB_SEARCH_MODEL, GEMMA_4_26B_MODEL, MISTRAL_REVIEW_MODEL, WEB_SEARCH_TOOLS
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
 from ._fallback import (
     ResponsePayloadError,
     fallback_reason_from_error,
     is_expected_fallback_error,
     should_propagate_error,
 )
-from ._llm_response import extract_response_text, parse_json_response, strip_json_fences
+from ._llm_response import extract_response_text, parse_json_response
 from ._text_utils import (
     coerce_text,
     extend_unique,
-    extract_grounding_queries,
     extract_grounding_urls,
     normalize_text_list,
     normalize_urls,
@@ -61,7 +61,7 @@ class ResearchService:
         if self.retry_delay_seconds < 3.0:
             self.retry_delay_seconds = 3.0
 
-    def research(
+    async def research(
         self,
         technology_names: list[str],
         *,
@@ -87,7 +87,7 @@ class ResearchService:
             fallback_reason: str | None = None
             prompt = self._build_prompt(normalized_name)
             try:
-                response = call_with_retry(
+                response = await async_call_with_retry(
                     adapter.generate_content,
                     prompt,
                     attempts=self.retry_attempts,
@@ -117,7 +117,7 @@ class ResearchService:
                 model_used = self.fallback_model
                 fallback_reason = fallback_reason_from_error(error)
                 sleep(self.retry_delay_seconds)
-                response = call_with_retry(
+                response = await async_call_with_retry(
                     self._get_fallback_adapter().chat_completions,
                     [
                         {"role": "system", "content": self._system_instruction()},
@@ -179,7 +179,7 @@ class ResearchService:
         started_at = perf_counter()
 
         planning_service = PlanningService()
-        plan, plan_context = planning_service.create_research_plan(
+        plan, plan_context = await planning_service.create_research_plan(
             target_technology=target_technology,
             research_brief=query,
             breadth=breadth,
@@ -211,20 +211,21 @@ class ResearchService:
         )
         embedding_service = EmbeddingService()
 
-        branch_results: list[ResearchBranchResult] = []
-        for branch in plan["branches"]:
-            branch_result = await self._execute_branch(
+        branch_results: list[ResearchBranchResult] = await asyncio.gather(*[
+            self._execute_branch(
                 branch=branch,
                 target_technology=target_technology,
-                query=query,
+                queries=branch["queries"],
                 breadth=breadth,
                 depth=depth,
                 web_search_service=web_search_service,
                 research_analysis_service=research_analysis_service,
                 embedding_service=embedding_service,
             )
-            branch_results.append(branch_result)
+            for branch in plan["branches"]
+        ])
 
+        for branch_result in branch_results:
             if progress_callback:
                 progress_callback("ResearchNodeEvaluated", {
                     "stage": "ResearchNodeEvaluated",
@@ -237,7 +238,7 @@ class ResearchService:
                 })
 
         synthesizer_service = SynthesizerService()
-        report, synth_context = synthesizer_service.synthesize_plan_results(
+        report, synth_context = await synthesizer_service.synthesize_plan_results(
             target_technology=target_technology,
             plan=plan,
             branch_results=branch_results,
@@ -262,52 +263,66 @@ class ResearchService:
         self,
         branch: ResearchPlanBranch,
         target_technology: str,
-        query: str,
+        queries: list[str],
         breadth: int,
         depth: int,
         web_search_service: Any,
         research_analysis_service: Any,
         embedding_service: Any,
     ) -> ResearchBranchResult:
-        search_result = await web_search_service.search_branch(
-            branch=branch,
-            query=query,
-            target_technology=target_technology,
-        )
+        all_learnings: list[str] = []
+        all_source_urls: list[str] = []
+        executed_queries: list[str] = []
+        accumulated_learnings: list[str] = []
+        embeddings: list[Any] = []
 
-        research_brief = f"Investigating {target_technology} in context: {query}"
-        
-        result = await research_analysis_service.analyze(
-            branch=branch,
-            query=query,
-            target_technology=target_technology,
-            research_brief=research_brief,
-            search_output=search_result,
-            accumulated_learnings=[],
-        )
-        learnings = result.get("learnings", [])
-        reviewed_urls = result.get("source_urls", [])
+        for iteration, query in enumerate(queries, start=1):
+            search_result = await web_search_service.search_branch(
+                branch=branch,
+                query=query,
+                target_technology=target_technology,
+            )
+            all_source_urls.extend(search_result.get("source_urls", []))
+            executed_queries.append(query)
 
-        embedding_artifact = embedding_service.embed_iteration(
-            branch_id=branch["branch_id"],
-            iteration=1,
-            query=query,
-            target_technology=target_technology,
-            learnings=learnings,
-            previous_embeddings=[],
-        )
-        
+            research_brief = f"Investigating {target_technology} in context: {query}"
+            result = await research_analysis_service.analyze(
+                branch=branch,
+                query=query,
+                target_technology=target_technology,
+                research_brief=research_brief,
+                search_output=search_result,
+                accumulated_learnings=accumulated_learnings,
+            )
+            learnings = result.get("learnings", [])
+            reviewed_urls = result.get("source_urls", [])
+            accumulated_learnings.extend(learnings)
+            all_learnings.extend(learnings)
+            all_source_urls.extend(reviewed_urls)
+
+            embedding_artifact = await embedding_service.embed_iteration(
+                branch_id=branch["branch_id"],
+                iteration=iteration,
+                query=query,
+                target_technology=target_technology,
+                learnings=learnings,
+                previous_embeddings=embeddings,
+            )
+            embeddings.append(embedding_artifact)
+
+        unique_source_urls = list(dict.fromkeys(all_source_urls))
+
         return ResearchBranchResult(
             branch_id=branch["branch_id"],
             provider=branch["provider"],
             objective=branch["objective"],
             search_model=branch["search_model"],
             review_model=branch["review_model"],
-            executed_queries=[query],
-            learnings=learnings,
-            source_urls=reviewed_urls,
-            iterations=1,
-            embeddings=[embedding_artifact],
+            executed_queries=executed_queries,
+            learnings=all_learnings,
+            source_urls=unique_source_urls,
+            iterations=len(queries),
+            embeddings=embeddings,
         )
 
     def _get_adapter(self) -> GeminiAdapter:
@@ -387,12 +402,6 @@ class ResearchService:
 
     def _extract_grounding_urls(self, response: dict[str, Any]) -> list[str]:
         return extract_grounding_urls(response)
-
-    def _extract_grounding_queries(self, response: dict[str, Any]) -> list[str]:
-        return extract_grounding_queries(response)
-
-    def _strip_json_fences(self, text: str) -> str:
-        return strip_json_fences(text)
 
     def _build_research(
         self,
@@ -556,5 +565,5 @@ class ResearchExecutionResult:
 
 
 
-def research_technologies(technology_names: list[str]) -> list[TechnologyResearch]:
-    return ResearchService().research(technology_names)
+async def research_technologies(technology_names: list[str]) -> list[TechnologyResearch]:
+    return await ResearchService().research(technology_names)

@@ -8,11 +8,12 @@ export function ViewToggle() {
   const setView = useAppStore((state) => state.setView);
 
   return (
-    <div className="flex items-center justify-center gap-1">
+    <div className="flex items-center justify-center gap-1" aria-label="Cambiar vista">
       {(["graph", "chat"] as const).map((v) => (
         <button
           key={v}
           onClick={() => setView(v)}
+          aria-pressed={view === v}
           className={`relative px-4 py-1.5 text-sm font-medium transition-colors ${
             view === v ? "text-foreground" : "text-muted-foreground"
           }`}

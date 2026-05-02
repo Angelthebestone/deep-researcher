@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { streamChatResearch } from "@/lib/api";
-import { useAppStore } from "@/stores/appStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { ChatStreamEvent, TechnologyMention, TechnologyReport } from "@/types/contracts";
 
 function getImprovedPrompt(event: ChatStreamEvent): string {
@@ -127,7 +127,7 @@ export function useChatStream(query: string | null, idempotencyKey: string | nul
       timeoutRef.current = null;
     }
 
-    const store = useAppStore.getState();
+    const store = useWorkspaceStore.getState();
     store.setIsAnalyzing(true);
     store.setErrorMessage(null);
     lastEventTimeRef.current = Date.now();
@@ -137,8 +137,9 @@ export function useChatStream(query: string | null, idempotencyKey: string | nul
         clearTimeout(timeoutRef.current);
       }
       timeoutRef.current = setTimeout(() => {
-        const state = useAppStore.getState();
-        if (state.isAnalyzing) {
+        const state = useWorkspaceStore.getState();
+        const active = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+        if (active?.isAnalyzing) {
           state.setIsAnalyzing(false);
           state.setErrorMessage("Se agoto el tiempo de espera del stream de investigacion.");
           state.addChatMessage({
@@ -161,22 +162,25 @@ export function useChatStream(query: string | null, idempotencyKey: string | nul
       lastEventTimeRef.current = Date.now();
       resetTimeout();
 
-      const state = useAppStore.getState();
+      const state = useWorkspaceStore.getState();
+      const active = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+      if (!active) return;
 
-      if (state.events.some((e) => e.event_id === event.event_id)) {
+      if (active.events.some((e) => e.event_id === event.event_id)) {
         return;
       }
 
       state.addEvent(event);
 
       if (event.event_type === "PromptImproved") {
-        const keywords = event.details && Array.isArray((event.details as any).keywords)
-          ? (event.details as any).keywords as string[]
+        const rawKeywords = event.details?.keywords;
+        const keywords = Array.isArray(rawKeywords)
+          ? rawKeywords.map((k) => String(k))
           : [];
         if (keywords.length > 0) {
           const mentions: TechnologyMention[] = keywords.map((keyword, index) => ({
             mention_id: `keyword-${index}-${Date.now()}`,
-            document_id: (event.document_id as string) || "",
+            document_id: event.document_id || "",
             source_type: "text",
             page_number: 0,
             raw_text: keyword,
@@ -192,13 +196,14 @@ export function useChatStream(query: string | null, idempotencyKey: string | nul
       }
 
       if (event.event_type === "ResearchNodeEvaluated") {
-        const sourceUrls = event.details && Array.isArray((event.details as any).source_urls)
-          ? (event.details as any).source_urls as string[]
+        const rawSourceUrls = event.details?.source_urls;
+        const sourceUrls = Array.isArray(rawSourceUrls)
+          ? rawSourceUrls.map((u) => String(u))
           : [];
         if (sourceUrls.length > 0) {
           const mention: TechnologyMention = {
             mention_id: `branch-${event.event_id}`,
-            document_id: (event.document_id as string) || "",
+            document_id: event.document_id || "",
             source_type: "text",
             page_number: 0,
             raw_text: `${getProvider(event)} research`,
@@ -279,7 +284,7 @@ export function useChatStream(query: string | null, idempotencyKey: string | nul
         source.close();
         return;
       }
-      const state = useAppStore.getState();
+      const state = useWorkspaceStore.getState();
       state.setErrorMessage("Error de conexion con el stream de chat");
       state.setIsAnalyzing(false);
       state.addChatMessage({

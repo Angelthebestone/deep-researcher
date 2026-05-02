@@ -103,6 +103,18 @@ cd frontend && npm run lint && npm run build
 - Backend: `8000`
 - Frontend: `3001` (not 3000 — `start_all.ps1` uses 3001)
 
+## Local Skills
+
+Repo-local skills live in `.agents/skills/` and load via the `skill` tool:
+
+| Skill | Trigger / Use |
+|-------|---------------|
+| **karpathy-guidelines** | Coding best practices, avoid LLM pitfalls, complex implementations |
+| **caveman** | Ultra-compressed communication (`/caveman`) |
+| **cavecrew** | Delegate to subagents (`/cavecrew`) |
+| **caveman-commit** | Compressed commit messages |
+| **caveman-review** | Compressed PR reviews |
+
 ## MCP Servers (opencode)
 
 Configured in `~/.config/opencode/opencode.jsonc`. Use these tools in prompts:
@@ -113,6 +125,9 @@ Configured in `~/.config/opencode/opencode.jsonc`. Use these tools in prompts:
 | **lucide** | Search Lucide icons by name, get JSX/SVG | `use lucide` |
 | **context7** | Library docs (Shadcn/UI, Tailwind, HeroUI, etc.) | `use context7` |
 | **fetch** | Fetch any URL as markdown/HTML/text | `use fetch` |
+| **github** | Repositories, issues, PRs, commits, search | `use github` |
+| **upstash** | Redis, QStash, Workflow, Box management | `use upstash` |
+| **sequential-thinking** | Reflective problem-solving and planning | `use sequential-thinking` |
 
 **Vercel MCP**: Remote at `https://mcp.vercel.com` with OAuth. First use opens browser for login.
 
@@ -122,4 +137,10 @@ Configured in `~/.config/opencode/opencode.jsonc`. Use these tools in prompts:
 
 **Fetch MCP**: Local via `npx -y mcp-fetch-server`. Generic URL fetching for arbitrary documentation.
 
-Example: When building UI components, add `use context7` to get Shadcn/UI docs, or `use lucide` to find icons.
+**GitHub MCP**: Local via `github-mcp-server.exe`. Requires `GITHUB_PERSONAL_ACCESS_TOKEN` env var.
+
+**Upstash MCP**: Local via `npx -y @upstash/mcp-server@latest`. Manages Redis databases, QStash queues/schedules, Workflow runs, and Box containers.
+
+**Sequential Thinking MCP**: Local via `npx -y @modelcontextprotocol/server-sequential-thinking`. Use for complex multi-step reasoning, planning, and problem decomposition.
+
+Example: When building UI components, add `use context7` to get Shadcn/UI docs, `use lucide` to find icons, or `use github` to manage PRs and issues.

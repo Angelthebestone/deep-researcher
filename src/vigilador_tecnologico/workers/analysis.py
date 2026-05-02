@@ -13,7 +13,7 @@ from vigilador_tecnologico.workers.orchestrator import PipelineOrchestrator, Pip
 logger = logging.getLogger("vigilador_tecnologico.workers.analysis")
 
 
-def execute_analysis_operation(
+async def execute_analysis_operation(
     *,
     stored_document: StoredDocument,
     operation_id: str,
@@ -68,7 +68,7 @@ def execute_analysis_operation(
                 details=details,
             )
 
-        result = pipeline_orchestrator.run_document(
+        result = await pipeline_orchestrator.run_document(
             stored_document=stored_document,
             parsed_document=parsed_document,
             document_storage=document_storage,

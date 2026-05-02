@@ -155,7 +155,7 @@ async def extract_document(document_id: str) -> DocumentExtractionResponse:
         raise HTTPException(status_code=404, detail=str(error)) from error
     try:
         parsed_document = _load_or_parse(stored_document)
-        mentions = document_extraction_service.extract(
+        mentions = await document_extraction_service.extract(
             stored_document.document_id,
             parsed_document.source_type,
             parsed_document.source_uri,
@@ -304,6 +304,86 @@ async def download_document_report(document_id: str) -> Response:
     return Response(content=markdown, media_type="text/markdown; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{document_id}-report.md"'})
 
 
+@router.get("/documents/{document_id}/export")
+async def export_document(document_id: str, format: str = "json") -> Response:
+    storage_service = _storage_service()
+    normalized = format.lower().strip()
+
+    if normalized == "json":
+        try:
+            report = storage_service.reports.load_for_document(document_id)
+        except FileNotFoundError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        payload = {
+            "document_id": document_id,
+            "exported_at": datetime.utcnow().isoformat(),
+            "report": report,
+        }
+        return Response(
+            content=json.dumps(payload, ensure_ascii=False, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{document_id}-export.json"'},
+        )
+
+    if normalized == "csv":
+        try:
+            mentions = storage_service.mentions.load_normalized(document_id)
+        except FileNotFoundError:
+            mentions = []
+        if not mentions:
+            try:
+                mentions = storage_service.mentions.load_extracted(document_id)
+            except FileNotFoundError:
+                mentions = []
+        content = _generate_csv(mentions)
+        return Response(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{document_id}-export.csv"'},
+        )
+
+    if normalized == "markdown":
+        try:
+            report = storage_service.reports.load_for_document(document_id)
+        except FileNotFoundError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        markdown = render_report_markdown(report)
+        return Response(
+            content=markdown,
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{document_id}-export.md"'},
+        )
+
+    raise HTTPException(status_code=400, detail=f"Unsupported format: {format}. Use json, csv, or markdown.")
+
+
+def _generate_csv(mentions: list[dict[str, Any]]) -> str:
+    headers = ["mention_id", "normalized_name", "category", "vendor", "version", "confidence", "source_uri", "page_number"]
+    lines = [",".join(headers)]
+    for m in mentions:
+        row = [
+            _csv_cell(m.get("mention_id", "")),
+            _csv_cell(m.get("normalized_name", "")),
+            _csv_cell(m.get("category", "")),
+            _csv_cell(m.get("vendor", "")),
+            _csv_cell(m.get("version", "")),
+            _csv_cell(str(m.get("confidence", ""))),
+            _csv_cell(m.get("source_uri", "")),
+            _csv_cell(str(m.get("page_number", ""))),
+        ]
+        lines.append(",".join(row))
+    return "\n".join(lines)
+
+
+def _csv_cell(value: str) -> str:
+    if not value:
+        return ""
+    if any(ch in value for ch in ",\"\n\r"):
+        escaped = value.replace("\"", "\"\"")
+        return f'"{escaped}"'
+    return value
+
+
 def _storage_service() -> StorageService:
     base_dir = document_storage.base_dir
     root_dir = base_dir.parent if base_dir.name == "documents" else base_dir
@@ -372,7 +452,7 @@ async def _launch_analysis_operation(stored_document: StoredDocument, operation_
         existing_task = dependencies.analysis_launch_tasks.get(operation_id)
         if existing_task is not None and not existing_task.done():
             return existing_task
-        task = asyncio.create_task(asyncio.to_thread(_execute_analysis_operation, stored_document, operation_id))
+        task = asyncio.create_task(_execute_analysis_operation(stored_document, operation_id))
         dependencies.analysis_launch_tasks[operation_id] = task
     def _cleanup(completed_task: asyncio.Task[Any]) -> None:
         current = dependencies.analysis_launch_tasks.get(operation_id)
@@ -382,15 +462,14 @@ async def _launch_analysis_operation(stored_document: StoredDocument, operation_
     return task
 
 
-def _execute_analysis_operation(stored_document: StoredDocument, operation_id: str) -> None:
-    execute_analysis_operation(
+async def _execute_analysis_operation(stored_document: StoredDocument, operation_id: str) -> None:
+    await execute_analysis_operation(
         stored_document=stored_document,
         operation_id=operation_id,
         storage_service=_storage_service(),
         document_storage=document_storage,
         operation_journal=operation_journal,
         pipeline_orchestrator=document_pipeline_orchestrator,
-        notification_service=notification_service,
         load_or_parse=_load_or_parse,
         document_parse_model_hint=_document_parse_model_hint(),
     )

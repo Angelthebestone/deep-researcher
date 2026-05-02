@@ -11,7 +11,7 @@ from typing import Any, cast
 from vigilador_tecnologico.contracts.models import SourceType, TechnologyCategory, TechnologyMention
 from vigilador_tecnologico.integrations import GeminiAdapter
 from vigilador_tecnologico.integrations.model_profiles import GEMMA_4_26B_MODEL
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
 from ._fallback import (
     ResponsePayloadError,
     fallback_reason_from_error,
@@ -42,11 +42,11 @@ class NormalizationService:
     retry_attempts: int = 3
     retry_delay_seconds: float = 1.0
 
-    def normalize(self, mentions: list[TechnologyMention]) -> list[TechnologyMention]:
-        normalized, _ = self.normalize_with_context(mentions)
+    async def normalize(self, mentions: list[TechnologyMention]) -> list[TechnologyMention]:
+        normalized, _ = await self.normalize_with_context(mentions)
         return normalized
 
-    def normalize_with_context(self, mentions: list[TechnologyMention]) -> tuple[list[TechnologyMention], dict[str, Any]]:
+    async def normalize_with_context(self, mentions: list[TechnologyMention]) -> tuple[list[TechnologyMention], dict[str, Any]]:
         if not mentions:
             return [], build_stage_context(
                 "TechnologiesNormalized",
@@ -57,7 +57,7 @@ class NormalizationService:
         adapter = self._get_adapter()
         started_at = perf_counter()
         try:
-            response = call_with_retry(
+            response = await async_call_with_retry(
                 adapter.generate_content,
                 self._build_prompt(mentions),
                 attempts=self.retry_attempts,
@@ -331,5 +331,5 @@ class NormalizationService:
         return f"mention-{digest[:16]}"
 
 
-def normalize_technologies(mentions: list[TechnologyMention]) -> list[TechnologyMention]:
-    return NormalizationService().normalize(mentions)
+async def normalize_technologies(mentions: list[TechnologyMention]) -> list[TechnologyMention]:
+    return await NormalizationService().normalize(mentions)

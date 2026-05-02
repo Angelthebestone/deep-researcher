@@ -77,7 +77,8 @@ def analysis_stream_payload(
     """Format event for documents/analyze/stream endpoint."""
     message = event.get("message")
     message_text = message if isinstance(message, str) else ""
-    is_failure = event.get("operation_status") == "failed"
+    operation_status = event.get("operation_status") or event.get("status", "")
+    is_failure = operation_status == "failed"
     event_type = "AnalysisFailed" if is_failure else message_text
     details = event.get("details") or {}
     stage_context: dict[str, Any] = {}
@@ -85,13 +86,13 @@ def analysis_stream_payload(
         raw_stage_context = details.get("stage_context")
         if isinstance(raw_stage_context, dict):
             stage_context = raw_stage_context
-    
+
     payload: dict[str, Any] = {
         "event_id": event["event_id"],
         "sequence": sequence,
         "operation_id": event["operation_id"],
         "operation_type": event["operation_type"],
-        "operation_status": event["operation_status"],
+        "operation_status": operation_status,
         "event_type": event_type,
         "message": message_text,
         "document_id": document_id,
