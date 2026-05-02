@@ -144,7 +144,13 @@ class DocumentAnalyzeIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
         first_response = self.client.post(
             f"/api/v1/documents/{document_id}/analyze",
-            json={"idempotency_key": "analysis-doc-1"},
+            json={
+                "idempotency_key": "analysis-doc-1",
+                "breadth": 3,
+                "depth": 2,
+                "freshness": "past_year",
+                "max_sources": 10,
+            },
         )
         self.assertEqual(first_response.status_code, 200)
         first_body = first_response.json()
@@ -153,7 +159,14 @@ class DocumentAnalyzeIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn(first_body["status"], {"queued", "running", "completed"})
         initial_report_id = first_body.get("report_id")
 
-        stream_response = await documents_module.stream_document_analysis(document_id, idempotency_key="analysis-doc-1")
+        stream_response = await documents_module.stream_document_analysis(
+            document_id,
+            idempotency_key="analysis-doc-1",
+            breadth=3,
+            depth=2,
+            freshness="past_year",
+            max_sources=10,
+        )
         self.assertEqual(stream_response.media_type, "text/event-stream")
 
         payloads = []
@@ -199,7 +212,13 @@ class DocumentAnalyzeIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
         second_response = self.client.post(
             f"/api/v1/documents/{document_id}/analyze",
-            json={"idempotency_key": "analysis-doc-1"},
+            json={
+                "idempotency_key": "analysis-doc-1",
+                "breadth": 3,
+                "depth": 2,
+                "freshness": "past_year",
+                "max_sources": 10,
+            },
         )
         self.assertEqual(second_response.status_code, 200)
         second_body = second_response.json()

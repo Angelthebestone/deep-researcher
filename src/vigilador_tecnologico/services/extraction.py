@@ -281,12 +281,6 @@ class ExtractionService:
             return {"mentions": parsed}
         raise ResponsePayloadError("Gemini extraction response must be a JSON object or array.")
 
-    def _extract_text(self, response: dict[str, Any]) -> str:
-        return extract_response_text(response)
-
-    def _strip_json_fences(self, text: str) -> str:
-        return strip_json_fences(text)
-
     def _build_mention(
         self,
         *,

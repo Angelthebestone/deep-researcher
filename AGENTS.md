@@ -121,15 +121,13 @@ Configured in `~/.config/opencode/opencode.jsonc`. Use these tools in prompts:
 
 | MCP | Usage | Prompt keyword |
 |-----|-------|----------------|
-| **vercel** | Deployments, logs, env vars, docs search | `use vercel` |
 | **lucide** | Search Lucide icons by name, get JSX/SVG | `use lucide` |
 | **context7** | Library docs (Shadcn/UI, Tailwind, HeroUI, etc.) | `use context7` |
 | **fetch** | Fetch any URL as markdown/HTML/text | `use fetch` |
 | **github** | Repositories, issues, PRs, commits, search | `use github` |
 | **upstash** | Redis, QStash, Workflow, Box management | `use upstash` |
 | **sequential-thinking** | Reflective problem-solving and planning | `use sequential-thinking` |
-
-**Vercel MCP**: Remote at `https://mcp.vercel.com` with OAuth. First use opens browser for login.
+| **memory** | Persistent knowledge graph across sessions | Auto-use for decisions, context, tracking |
 
 **Context7 MCP**: Remote at `https://mcp.context7.com/mcp`. Free, no API key. Use for component examples, API refs, theming docs.
 
@@ -142,5 +140,11 @@ Configured in `~/.config/opencode/opencode.jsonc`. Use these tools in prompts:
 **Upstash MCP**: Local via `npx -y @upstash/mcp-server@latest`. Manages Redis databases, QStash queues/schedules, Workflow runs, and Box containers.
 
 **Sequential Thinking MCP**: Local via `npx -y @modelcontextprotocol/server-sequential-thinking`. Use for complex multi-step reasoning, planning, and problem decomposition.
+
+**Memory MCP**: Local via `npx -y @modelcontextprotocol/server-memory`. Persistent knowledge graph stored at `~/.config/opencode/memory.jsonl`. Use for:
+- **Decision log**: Record architecture decisions and rationale
+- **Technology tracking**: Track competitors, tools, integrations
+- **Session continuity**: Remember progress, bugs, pending work
+- **Auto-trigger**: opencode uses memory automatically for cross-session context
 
 Example: When building UI components, add `use context7` to get Shadcn/UI docs, `use lucide` to find icons, or `use github` to manage PRs and issues.

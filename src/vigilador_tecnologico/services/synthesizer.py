@@ -70,6 +70,8 @@ class SynthesizerService:
                 "branch_id": "legacy-branch",
                 "provider": "gemini_grounded",
                 "objective": f"Legacy learnings consolidation for {target_technology}.",
+                "search_model": self.model,
+                "review_model": self.model,
                 "executed_queries": [target_technology],
                 "learnings": learnings,
                 "source_urls": [],

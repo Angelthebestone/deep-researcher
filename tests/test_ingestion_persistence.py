@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -15,12 +16,12 @@ from vigilador_tecnologico.storage.service import StorageService
 
 
 class _FailingModelAdapter:
-    def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
+    async def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
         raise DocumentIngestionError("simulated Gemini quota failure")
 
 
 class _LocalAdapter:
-    def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
+    async def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
         return IngestedDocument(
             source_uri=source_uri,
             source_type="pdf",
@@ -35,7 +36,7 @@ class _OrderedModelAdapter(ModelDocumentIngestionAdapter):
         super().__init__()
         self.attempted_models: list[str] = []
 
-    def _ingest_with_model(
+    async def _ingest_with_model(
         self,
         *,
         model: str,
@@ -63,7 +64,7 @@ class _TimeoutAwareOrderedModelAdapter(ModelDocumentIngestionAdapter):
         super().__init__()
         self.attempted_models: list[str] = []
 
-    def _ingest_with_model(
+    async def _ingest_with_model(
         self,
         *,
         model: str,
@@ -95,7 +96,7 @@ class IngestionPersistenceTest(unittest.TestCase):
             source.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF")
             adapter = _OrderedModelAdapter()
 
-            result = adapter.ingest(source.resolve().as_uri(), "pdf")
+            result = asyncio.run(adapter.ingest(source.resolve().as_uri(), "pdf"))
 
             self.assertEqual(
                 adapter.attempted_models,
@@ -113,7 +114,7 @@ class IngestionPersistenceTest(unittest.TestCase):
             local_adapter=_LocalAdapter(),
         )
 
-        result = adapter.ingest("source.pdf", "pdf")
+        result = asyncio.run(adapter.ingest("source.pdf", "pdf"))
 
         self.assertEqual(result.raw_text, "FastAPI\nPostgreSQL")
         self.assertEqual(result.page_count, 2)
@@ -126,7 +127,7 @@ class IngestionPersistenceTest(unittest.TestCase):
             source.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF")
             adapter = _TimeoutAwareOrderedModelAdapter()
 
-            result = adapter.ingest(source.resolve().as_uri(), "pdf")
+            result = asyncio.run(adapter.ingest(source.resolve().as_uri(), "pdf"))
 
             self.assertEqual(
                 adapter.attempted_models,

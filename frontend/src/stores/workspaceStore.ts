@@ -25,7 +25,7 @@ function makeWorkspace(input: WorkspaceCreateInput): Workspace {
     updatedAt: now,
     events: [],
     chatMessages: [],
-    researchParams: { depth: 2, breadth: 3, contextFiles: [] },
+    researchParams: { depth: 2, breadth: 3, freshness: "past_year", max_sources: 10, contextFiles: [] },
     currentOperation: null,
     currentDocument: null,
     mentions: [],

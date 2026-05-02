@@ -114,8 +114,11 @@ class ReportRepository:
         index_path = self.base_dir / "by_document" / f"{document_id}.json"
         if not index_path.exists():
             raise FileNotFoundError(f"Report not found for document: {document_id}")
-        payload = json.loads(index_path.read_text(encoding="utf-8"))
-        return self.load(str(payload["report_id"]))
+        try:
+            payload = json.loads(index_path.read_text(encoding="utf-8"))
+            return self.load(str(payload["report_id"]))
+        except (KeyError, TypeError):
+            raise FileNotFoundError(f"Report not found for document: {document_id}")
 
     def load_markdown_for_document(self, document_id: str) -> str:
         index_path = self.base_dir / "by_document" / f"{document_id}.json"

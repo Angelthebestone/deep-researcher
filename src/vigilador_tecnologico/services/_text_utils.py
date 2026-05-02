@@ -132,34 +132,6 @@ def extract_grounding_urls(response: dict[str, Any]) -> list[str]:
     return urls
 
 
-def extract_grounding_queries(response: dict[str, Any]) -> list[str]:
-    """Extract grounding search queries from a Gemini API response."""
-    candidates = response.get("candidates")
-    if not isinstance(candidates, list):
-        return []
-
-    queries: list[str] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        if not isinstance(candidate, dict):
-            continue
-        grounding_metadata = candidate.get("groundingMetadata") or candidate.get("grounding_metadata")
-        if not isinstance(grounding_metadata, dict):
-            continue
-        raw_queries = grounding_metadata.get("webSearchQueries") or grounding_metadata.get("web_search_queries")
-        if not isinstance(raw_queries, list):
-            continue
-        for query in raw_queries:
-            if not isinstance(query, str):
-                continue
-            normalized = query.strip()
-            if not normalized or normalized in seen:
-                continue
-            seen.add(normalized)
-            queries.append(normalized)
-    return queries
-
-
 def deduplicate_text_list(value: Any) -> list[str]:
     """Return a case-insensitive deduplicated list of non-empty strings."""
     if not isinstance(value, list):

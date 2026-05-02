@@ -31,8 +31,10 @@ class WebSearchService:
     retry_attempts: int = 2
     retry_delay_seconds: float = 7.0
     retry_backoff_factor: float = 5.0
+    freshness: str = "past_year"
+    max_sources: int = 10
 
-    async def search_branch(self, branch: ResearchPlanBranch, *, queries: list[str], target_technology: str) -> dict[str, Any]:
+    async def search_branch(self, branch: ResearchPlanBranch, *, queries: list[str], target_technology: str, freshness: str, max_sources: int) -> dict[str, Any]:
         results: list[str] = []
         source_urls: list[str] = []
         for query in queries:
@@ -41,7 +43,7 @@ class WebSearchService:
             elif branch["provider"] == "mistral_web_search":
                 r = await self._search_with_mistral(query, target_technology)
             elif branch["provider"] == "openrouter_search":
-                r = await self._search_with_openrouter(query, target_technology)
+                r = await self._search_with_openrouter(query, target_technology, freshness=freshness, max_sources=max_sources)
             else:
                 raise ValueError(f"Unsupported research provider: {branch['provider']}")
             results.append(r["raw_text"])
@@ -112,10 +114,10 @@ class WebSearchService:
         raw_text = f"{summary}\n" + "\n".join(f"- {learning}" for learning in learnings)
         return {"raw_text": raw_text.strip(), "source_urls": source_urls}
 
-    async def _search_with_openrouter(self, query: str, target_technology: str) -> dict[str, Any]:
+    async def _search_with_openrouter(self, query: str, target_technology: str, *, freshness: str, max_sources: int) -> dict[str, Any]:
         if self.search_router is None:
             raise ValueError("search_router is required for openrouter_search.")
-        search_results = await self.search_router.search(query, query_type="risk", freshness="past_year")
+        search_results = await self.search_router.search(query, query_type="risk", freshness=freshness, max_results=max_sources)
         context_parts: list[str] = []
         urls: list[str] = []
         for result in search_results:

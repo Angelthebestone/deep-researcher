@@ -53,6 +53,12 @@
     "event_count": {
       "type": "integer",
       "minimum": 0
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "operation_event.schema.json"
+      }
     }
   }
 }

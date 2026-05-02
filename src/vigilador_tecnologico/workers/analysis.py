@@ -23,11 +23,15 @@ async def execute_analysis_operation(
     pipeline_orchestrator: PipelineOrchestrator,
     load_or_parse: Callable[[StoredDocument], Any],
     document_parse_model_hint: str,
+    breadth: int,
+    depth: int,
+    freshness: str,
+    max_sources: int,
 ) -> None:
     try:
         parsed_started_at = perf_counter()
         try:
-            parsed_document = load_or_parse(stored_document)
+            parsed_document = await load_or_parse(stored_document)
         except Exception as error:
             raise PipelineStageError(
                 "DocumentParsed",
@@ -74,6 +78,8 @@ async def execute_analysis_operation(
             document_storage=document_storage,
             storage_service=storage_service,
             record_event=record_event,
+            breadth=breadth,
+            depth=depth,
         )
         
 

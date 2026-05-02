@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -74,7 +74,7 @@ def _repo() -> _WorkspaceRepo:
 
 @router.post("/workspaces", response_model=WorkspaceResponse, status_code=201)
 async def create_workspace(payload: WorkspaceCreateRequest) -> WorkspaceResponse:
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(UTC).isoformat()
     workspace_id = uuid.uuid4().hex
     record = {
         "workspace_id": workspace_id,
@@ -116,7 +116,7 @@ async def update_workspace(workspace_id: str, payload: WorkspaceUpdateRequest) -
         record["status"] = payload.status
     if payload.data is not None:
         record["data"] = payload.data
-    record["updated_at"] = datetime.utcnow().isoformat()
+    record["updated_at"] = datetime.now(UTC).isoformat()
     _repo().save(workspace_id, record)
     return WorkspaceResponse.model_validate(record)
 

@@ -313,7 +313,7 @@ export function ThinkingTimeline() {
                           <div className="space-y-0.5">
                             {(() => {
                               const reportRaw =
-                                (details.report as string | undefined) || event.report;
+                                (details.report as string | undefined) || event.report_markdown;
                               const report = typeof reportRaw === "string" ? reportRaw : null;
                               if (!report) return null;
                               return (

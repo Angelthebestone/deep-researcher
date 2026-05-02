@@ -11,7 +11,7 @@ export function ResearchConsole() {
   const setConsoleOpen = useAppStore((s) => s.setConsoleOpen);
 
   const workspace = useActiveWorkspace();
-  const researchParams = workspace?.researchParams ?? { depth: 2, breadth: 3, contextFiles: [] };
+  const researchParams = workspace?.researchParams ?? { depth: 2, breadth: 3, freshness: "past_year", max_sources: 10, contextFiles: [] };
   const currentOperation = workspace?.currentOperation ?? null;
   const setResearchParam = useWorkspaceStore((s) => s.setResearchParam);
   const resetSession = useWorkspaceStore((s) => s.resetSession);
@@ -108,6 +108,46 @@ export function ResearchConsole() {
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Focalizado</span>
             <span>Panoramico</span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-foreground">Antiguedad</span>
+            <span className="text-sm text-muted-foreground">
+              {researchParams.freshness === "past_month" ? "Ultimo mes" : researchParams.freshness === "past_year" ? "Ultimo ano" : "Cualquier fecha"}
+            </span>
+          </div>
+          <select
+            value={researchParams.freshness}
+            onChange={(e) => setResearchParam("freshness", e.target.value)}
+            className="w-full text-sm bg-transparent border border-border/30 rounded-lg p-2 text-foreground"
+          >
+            <option value="past_month">Ultimo mes</option>
+            <option value="past_year">Ultimo ano</option>
+            <option value="any">Cualquier fecha</option>
+          </select>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-foreground">Fuentes maximas</span>
+            <span className="text-sm text-muted-foreground">
+              {researchParams.max_sources}
+            </span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={20}
+            step={1}
+            value={researchParams.max_sources}
+            onChange={(e) => setResearchParam("max_sources", Number(e.target.value))}
+            className="w-full accent-lime-600"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>1 fuente</span>
+            <span>20 fuentes</span>
           </div>
         </div>
 

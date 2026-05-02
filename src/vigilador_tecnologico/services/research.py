@@ -4,7 +4,6 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import perf_counter
-from time import sleep
 import re
 from typing import Any, Callable, cast
 
@@ -61,6 +60,7 @@ class ResearchService:
         if self.retry_delay_seconds < 3.0:
             self.retry_delay_seconds = 3.0
 
+    # TODO: Deprecated, migrate callers to execute_full_research
     async def research(
         self,
         technology_names: list[str],
@@ -116,7 +116,7 @@ class ResearchService:
                 fallback_history.append(f"{normalized_name} | fallback:{self.fallback_model}:{type(error).__name__}")
                 model_used = self.fallback_model
                 fallback_reason = fallback_reason_from_error(error)
-                sleep(self.retry_delay_seconds)
+                await asyncio.sleep(self.retry_delay_seconds)
                 response = await async_call_with_retry(
                     self._get_fallback_adapter().chat_completions,
                     [
@@ -154,8 +154,10 @@ class ResearchService:
         self,
         target_technology: str,
         query: str,
-        breadth: int = 3,
-        depth: int = 1,
+        breadth: int,
+        depth: int,
+        freshness: str,
+        max_sources: int,
         progress_callback: Callable[[str, dict], None] | None = None,
     ) -> ResearchExecutionResult:
         """
@@ -204,6 +206,8 @@ class ResearchService:
         web_search_service = WebSearchService(
             gemini_adapter=gemini_adapter,
             mistral_adapter=mistral_adapter,
+            freshness=freshness,
+            max_sources=max_sources,
         )
         research_analysis_service = ResearchAnalysisService(
             gemma_adapter=GeminiAdapter(model=GEMMA_4_26B_MODEL),
@@ -218,6 +222,8 @@ class ResearchService:
                 queries=branch["queries"],
                 breadth=breadth,
                 depth=depth,
+                freshness=freshness,
+                max_sources=max_sources,
                 web_search_service=web_search_service,
                 research_analysis_service=research_analysis_service,
                 embedding_service=embedding_service,
@@ -266,6 +272,8 @@ class ResearchService:
         queries: list[str],
         breadth: int,
         depth: int,
+        freshness: str,
+        max_sources: int,
         web_search_service: Any,
         research_analysis_service: Any,
         embedding_service: Any,
@@ -279,8 +287,10 @@ class ResearchService:
         for iteration, query in enumerate(queries, start=1):
             search_result = await web_search_service.search_branch(
                 branch=branch,
-                query=query,
+                queries=[query],
                 target_technology=target_technology,
+                freshness=freshness,
+                max_sources=max_sources,
             )
             all_source_urls.extend(search_result.get("source_urls", []))
             executed_queries.append(query)
@@ -565,5 +575,4 @@ class ResearchExecutionResult:
 
 
 
-async def research_technologies(technology_names: list[str]) -> list[TechnologyResearch]:
-    return await ResearchService().research(technology_names)
+

@@ -246,4 +246,4 @@ class PromptEngineeringService:
         text = str(value).strip()
         return text
 
-prompt_engineering_service = PromptEngineeringService()
+

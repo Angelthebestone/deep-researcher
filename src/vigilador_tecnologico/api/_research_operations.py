@@ -110,6 +110,8 @@ async def execute_research_operation(
                 query=custom_query or request["query"],
                 breadth=request["breadth"],
                 depth=request["depth"],
+                freshness=request["freshness"],
+                max_sources=request["max_sources"],
                 progress_callback=progress_callback,
             ),
             timeout=timeout_seconds,

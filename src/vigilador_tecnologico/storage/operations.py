@@ -96,8 +96,6 @@ class OperationJournal:
             details=details or {},
             event_key=event_key,
         )
-        if return_event is not None:
-            return record
         return record
 
     def mark_completed(

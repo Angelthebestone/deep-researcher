@@ -85,25 +85,35 @@ export async function getOperationRecord(operationId: string): Promise<Operation
   return readJson<OperationRecord>(response);
 }
 
-export function createAnalyzeStreamUrl(documentId: string, idempotencyKey: string) {
+export function createAnalyzeStreamUrl(documentId: string, idempotencyKey: string, breadth: number, depth: number, freshness: string, max_sources: number) {
   const url = new URL(
     buildUrl(`/api/v1/documents/${encodeURIComponent(documentId)}/analyze/stream`),
   );
   url.searchParams.set("idempotency_key", idempotencyKey);
+  url.searchParams.set("breadth", String(breadth));
+  url.searchParams.set("depth", String(depth));
+  url.searchParams.set("freshness", freshness);
+  url.searchParams.set("max_sources", String(max_sources));
   return url.toString();
 }
 
-export function createResearchStreamUrl(technology: string, breadth: number, depth: number) {
+export function createResearchStreamUrl(technology: string, breadth: number, depth: number, freshness: string, max_sources: number) {
   const url = new URL(buildUrl("/api/v1/research/stream"));
   url.searchParams.set("technology", technology);
   url.searchParams.set("breadth", String(breadth));
   url.searchParams.set("depth", String(depth));
+  url.searchParams.set("freshness", freshness);
+  url.searchParams.set("max_sources", String(max_sources));
   return url.toString();
 }
 
-export function createChatStreamUrl(query: string, idempotencyKey?: string | null) {
+export function createChatStreamUrl(query: string, breadth: number, depth: number, freshness: string, max_sources: number, idempotencyKey?: string | null) {
   const url = new URL(buildUrl("/api/v1/chat/stream"));
   url.searchParams.set("query", query);
+  url.searchParams.set("breadth", String(breadth));
+  url.searchParams.set("depth", String(depth));
+  url.searchParams.set("freshness", freshness);
+  url.searchParams.set("max_sources", String(max_sources));
   if (idempotencyKey) {
     url.searchParams.set("idempotency_key", idempotencyKey);
   }
@@ -112,10 +122,14 @@ export function createChatStreamUrl(query: string, idempotencyKey?: string | nul
 
 export function streamChatResearch(
   query: string,
+  breadth: number,
+  depth: number,
+  freshness: string,
+  max_sources: number,
   idempotencyKey: string,
   onEvent: (event: ChatStreamEvent) => void,
 ) {
-  const source = new EventSource(createChatStreamUrl(query, idempotencyKey));
+  const source = new EventSource(createChatStreamUrl(query, breadth, depth, freshness, max_sources, idempotencyKey));
   source.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data) as ChatStreamEvent;

@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -84,6 +84,10 @@ class DocumentMentionsResponseModel(BaseModel):
 
 class DocumentAnalyzeRequest(BaseModel):
     idempotency_key: str | None = None
+    breadth: int
+    depth: int
+    freshness: str
+    max_sources: int
 
 
 class DocumentAnalyzeResponse(BaseModel):
@@ -125,7 +129,7 @@ async def upload_document(payload: DocumentUploadRequest) -> DocumentUploadRespo
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     try:
-        parsed_document = _parse_and_persist(stored_document)
+        parsed_document = await _parse_and_persist(stored_document)
     except Exception as error:
         document_storage.save_status(stored_document.document_id, "UPLOADED", error=str(error))
         raise HTTPException(status_code=502, detail=str(error)) from error
@@ -154,7 +158,7 @@ async def extract_document(document_id: str) -> DocumentExtractionResponse:
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     try:
-        parsed_document = _load_or_parse(stored_document)
+        parsed_document = await _load_or_parse(stored_document)
         mentions = await document_extraction_service.extract(
             stored_document.document_id,
             parsed_document.source_type,
@@ -217,16 +221,16 @@ def _serialize_mention(mention: TechnologyMention) -> dict[str, Any]:
     return dict(mention)
 
 
-def _load_or_parse(stored_document: StoredDocument) -> ParsedDocumentRecord:
+async def _load_or_parse(stored_document: StoredDocument) -> ParsedDocumentRecord:
     try:
         return document_storage.load_parsed_result(stored_document.document_id)
     except FileNotFoundError:
-        return _parse_and_persist(stored_document)
+        return await _parse_and_persist(stored_document)
 
 
-def _parse_and_persist(stored_document: StoredDocument) -> ParsedDocumentRecord:
+async def _parse_and_persist(stored_document: StoredDocument) -> ParsedDocumentRecord:
     logger.info("Starting document ingest", extra={"document_id": stored_document.document_id, "source_type": stored_document.source_type, "source_uri": stored_document.source_uri})
-    ingest_result = document_ingest_worker.ingest(stored_document.source_uri, stored_document.source_type, stored_document.document_id)
+    ingest_result = await document_ingest_worker.ingest(stored_document.source_uri, stored_document.source_type, stored_document.document_id)
     logger.info("DocumentParsed", extra={"document_id": stored_document.document_id, "page_count": ingest_result.page_count, "ingestion_engine": ingest_result.ingestion_engine, "raw_text_length": len(ingest_result.raw_text)})
     parsed_document = document_storage.save_parsed_result(
         stored_document.document_id,
@@ -244,29 +248,30 @@ def _parse_and_persist(stored_document: StoredDocument) -> ParsedDocumentRecord:
 
 
 @router.post("/documents/{document_id}/analyze", response_model=DocumentAnalyzeResponse)
-async def analyze_document(document_id: str, payload: DocumentAnalyzeRequest | None = None) -> DocumentAnalyzeResponse:
+async def analyze_document(document_id: str, payload: DocumentAnalyzeRequest) -> DocumentAnalyzeResponse:
     try:
         stored_document = document_storage.load(document_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    request = payload or DocumentAnalyzeRequest()
+    request = payload
     idempotency_key = _analysis_idempotency_key(stored_document, request.idempotency_key)
     operation, reused = _ensure_analysis_operation(stored_document, idempotency_key)
-    await _launch_analysis_operation(stored_document, str(operation["operation_id"]))
+    await _launch_analysis_operation(stored_document, str(operation["operation_id"]), request)
     operation = operation_journal.load(operation["operation_id"])
     return _build_analyze_response(stored_document.document_id, operation, idempotency_key, reused=reused)
 
 
 @router.get("/documents/{document_id}/analyze/stream")
-async def stream_document_analysis(document_id: str, idempotency_key: str | None = None) -> StreamingResponse:
+async def stream_document_analysis(document_id: str, breadth: int, depth: int, freshness: str, max_sources: int, idempotency_key: str | None = None) -> StreamingResponse:
     try:
         stored_document = document_storage.load(document_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    resolved_idempotency_key = _analysis_idempotency_key(stored_document, idempotency_key)
+    payload = DocumentAnalyzeRequest(idempotency_key=idempotency_key, breadth=breadth, depth=depth, freshness=freshness, max_sources=max_sources)
+    resolved_idempotency_key = _analysis_idempotency_key(stored_document, payload.idempotency_key)
     operation, reused = _ensure_analysis_operation(stored_document, resolved_idempotency_key)
     watch_until_complete = not reused or str(operation["status"]) in {"queued", "running"}
-    worker_task = await _launch_analysis_operation(stored_document, str(operation["operation_id"]))
+    worker_task = await _launch_analysis_operation(stored_document, str(operation["operation_id"]), payload)
     return StreamingResponse(
         _analysis_stream_events(
             stored_document=stored_document,
@@ -316,7 +321,7 @@ async def export_document(document_id: str, format: str = "json") -> Response:
             raise HTTPException(status_code=404, detail=str(error)) from error
         payload = {
             "document_id": document_id,
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
             "report": report,
         }
         return Response(
@@ -441,7 +446,7 @@ def _ensure_analysis_operation(stored_document: StoredDocument, idempotency_key:
     return operation, False
 
 
-async def _launch_analysis_operation(stored_document: StoredDocument, operation_id: str) -> asyncio.Task[Any] | None:
+async def _launch_analysis_operation(stored_document: StoredDocument, operation_id: str, payload: DocumentAnalyzeRequest) -> asyncio.Task[Any] | None:
     try:
         operation = operation_journal.load(operation_id)
     except FileNotFoundError:
@@ -452,7 +457,7 @@ async def _launch_analysis_operation(stored_document: StoredDocument, operation_
         existing_task = dependencies.analysis_launch_tasks.get(operation_id)
         if existing_task is not None and not existing_task.done():
             return existing_task
-        task = asyncio.create_task(_execute_analysis_operation(stored_document, operation_id))
+        task = asyncio.create_task(_execute_analysis_operation(stored_document, operation_id, payload))
         dependencies.analysis_launch_tasks[operation_id] = task
     def _cleanup(completed_task: asyncio.Task[Any]) -> None:
         current = dependencies.analysis_launch_tasks.get(operation_id)
@@ -462,7 +467,7 @@ async def _launch_analysis_operation(stored_document: StoredDocument, operation_
     return task
 
 
-async def _execute_analysis_operation(stored_document: StoredDocument, operation_id: str) -> None:
+async def _execute_analysis_operation(stored_document: StoredDocument, operation_id: str, payload: DocumentAnalyzeRequest) -> None:
     await execute_analysis_operation(
         stored_document=stored_document,
         operation_id=operation_id,
@@ -472,6 +477,10 @@ async def _execute_analysis_operation(stored_document: StoredDocument, operation
         pipeline_orchestrator=document_pipeline_orchestrator,
         load_or_parse=_load_or_parse,
         document_parse_model_hint=_document_parse_model_hint(),
+        breadth=payload.breadth,
+        depth=payload.depth,
+        freshness=payload.freshness,
+        max_sources=payload.max_sources,
     )
 
 

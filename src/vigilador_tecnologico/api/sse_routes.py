@@ -18,7 +18,7 @@ from vigilador_tecnologico.api._research_operations import (
 from vigilador_tecnologico.api._sse_formatters import chat_event_payload, research_event_payload
 from vigilador_tecnologico.contracts.models import ResearchRequest
 from vigilador_tecnologico.services._stage_context import build_stage_context
-from vigilador_tecnologico.services.prompt_engineering import prompt_engineering_service
+from vigilador_tecnologico.services.prompt_engineering import PromptEngineeringService
 from vigilador_tecnologico.services.research import ResearchService
 from vigilador_tecnologico.storage.operations import operation_journal
 
@@ -83,21 +83,21 @@ def _coerce_research_int(value: int, *, default: int, minimum: int, maximum: int
     return max(minimum, min(maximum, candidate))
 
 
-def _build_research_request(query: str, *, breadth: int = 3, depth: int = 2, idempotency_key: str | None = None) -> ResearchRequest:
+def _build_research_request(query: str, breadth: int, depth: int, freshness: str, max_sources: int, idempotency_key: str | None = None) -> ResearchRequest:
     target_technology = _normalize_target_technology(query)
     canonical_query = " ".join(query.strip().split()) or f"Analyze {target_technology}"
-    breadth_value = _coerce_research_int(breadth, default=3, minimum=1, maximum=5)
-    depth_value = _coerce_research_int(depth, default=2, minimum=1, maximum=3)
     document_id = _research_document_id(target_technology)
     resolved_idempotency_key = (
-        idempotency_key.strip() if isinstance(idempotency_key, str) and idempotency_key.strip() else _research_idempotency_key(target_technology, breadth_value, depth_value)
+        idempotency_key.strip() if isinstance(idempotency_key, str) and idempotency_key.strip() else _research_idempotency_key(target_technology, breadth, depth)
     )
     return {
         "query": canonical_query,
         "target_technology": target_technology,
         "document_id": document_id,
-        "breadth": breadth_value,
-        "depth": depth_value,
+        "breadth": breadth,
+        "depth": depth,
+        "freshness": freshness,
+        "max_sources": max_sources,
         "idempotency_key": resolved_idempotency_key,
     }
 
@@ -190,8 +190,8 @@ async def research_event_stream(
 
 
 @router.get("/research/stream")
-async def stream_research(technology: str, breadth: int = 3, depth: int = 2, idempotency_key: str | None = None):
-    request = _build_research_request(f"Analyze {technology}", breadth=breadth, depth=depth, idempotency_key=idempotency_key)
+async def stream_research(technology: str, breadth: int, depth: int, freshness: str, max_sources: int, idempotency_key: str | None = None):
+    request = _build_research_request(f"Analyze {technology}", breadth=breadth, depth=depth, freshness=freshness, max_sources=max_sources, idempotency_key=idempotency_key)
     return StreamingResponse(
         research_event_stream(request),
         media_type="text/event-stream",
@@ -200,9 +200,10 @@ async def stream_research(technology: str, breadth: int = 3, depth: int = 2, ide
 
 
 @router.get("/chat/stream")
-async def stream_chat_research(query: str, idempotency_key: str | None = None):
+async def stream_chat_research(query: str, breadth: int, depth: int, freshness: str, max_sources: int, idempotency_key: str | None = None):
+    prompt_engineering_service = PromptEngineeringService()
     async def chat_generator():
-        request = _build_research_request(query, breadth=3, depth=2, idempotency_key=idempotency_key)
+        request = _build_research_request(query, breadth=breadth, depth=depth, freshness=freshness, max_sources=max_sources, idempotency_key=idempotency_key)
         operation, reused = _ensure_research_operation(request, start_requested=False)
         if reused:
             async for event in research_event_stream(request, operation=operation, reused_operation=True, sequence_start=1):

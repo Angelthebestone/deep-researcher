@@ -119,6 +119,10 @@ export function ChatInputBar({
 
         await startAnalysis(response.document_id, {
           idempotency_key: response.document_id,
+          breadth: workspace.researchParams.breadth,
+          depth: workspace.researchParams.depth,
+          freshness: workspace.researchParams.freshness,
+          max_sources: workspace.researchParams.max_sources,
         });
 
         setIsAnalyzing(true);

@@ -68,7 +68,7 @@ class _PromptJournalStub:
 
 
 class _FakeResearchService:
-    async def execute_full_research(self, target_technology, query, breadth, depth, progress_callback):
+    async def execute_full_research(self, target_technology, query, breadth, depth, freshness, max_sources, progress_callback):
         from dataclasses import dataclass
         
         @dataclass
@@ -171,14 +171,25 @@ class SSEStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
             }
             yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
+        class _FakePromptEngineeringService:
+            def __init__(self, model="fake"):
+                self.model = model
+
+            async def improve_query(self, raw_query):
+                return await _fake_improve_query(raw_query)
+
         with (
-            patch.object(sse_routes.prompt_engineering_service, "improve_query", new=_fake_improve_query),
+            patch.object(sse_routes, "PromptEngineeringService", new=_FakePromptEngineeringService),
             patch.object(sse_routes, "_ensure_research_operation", new=_fake_ensure_operation),
             patch.object(sse_routes, "research_event_stream", new=_fake_research_event_stream),
             patch.object(sse_routes, "operation_journal", new=_PromptJournalStub()),
         ):
             response = await sse_routes.stream_chat_research(
                 "investiga sobre Gasificación por plasma para biomasa",
+                breadth=3,
+                depth=2,
+                freshness="past_year",
+                max_sources=10,
                 idempotency_key="chat-plasma-1",
             )
             payloads = []
@@ -201,6 +212,8 @@ class SSEStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
             "Analyze Plasma Gasification for Biomass",
             breadth=3,
             depth=2,
+            freshness="past_year",
+            max_sources=10,
             idempotency_key="research-plasma-1",
         )
         fake_research_service = _FakeResearchService()
@@ -229,6 +242,8 @@ class SSEStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
             "investiga sobre Gasificación por plasma para biomasa.",
             breadth=3,
             depth=2,
+            freshness="past_year",
+            max_sources=10,
             idempotency_key="chat-plasma-2",
         )
 

@@ -29,8 +29,8 @@ function getReportContent(event: ChatStreamEvent): string {
       return event.details.report_markdown;
     }
   }
-  if (typeof event.report === "string") {
-    return event.report;
+  if (typeof event.report_markdown === "string") {
+    return event.report_markdown;
   }
   return event.message;
 }
@@ -158,7 +158,18 @@ export function useChatStream(query: string | null, idempotencyKey: string | nul
 
     resetTimeout();
 
-    const source = streamChatResearch(query, idempotencyKey, (event: ChatStreamEvent) => {
+    const active = useWorkspaceStore.getState().workspaces.find(
+      (w) => w.id === useWorkspaceStore.getState().activeWorkspaceId
+    );
+    const researchParams = active?.researchParams ?? { depth: 2, breadth: 3, freshness: "past_year", max_sources: 10 };
+    const source = streamChatResearch(
+      query,
+      researchParams.breadth,
+      researchParams.depth,
+      researchParams.freshness,
+      researchParams.max_sources,
+      idempotencyKey,
+      (event: ChatStreamEvent) => {
       lastEventTimeRef.current = Date.now();
       resetTimeout();
 
@@ -219,9 +230,9 @@ export function useChatStream(query: string | null, idempotencyKey: string | nul
       }
 
       if (event.event_type === "ReportGenerated" || event.event_type === "ResearchCompleted") {
-        const report = event.report;
-        if (report && typeof report === "object" && (report as TechnologyReport).report_id) {
-          state.setReport(report as TechnologyReport);
+        const report = event.report_artifact;
+        if (report && typeof report === "object" && report.report_id) {
+          state.setReport(report);
         }
       }
 

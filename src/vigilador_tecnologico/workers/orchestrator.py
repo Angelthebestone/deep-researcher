@@ -54,8 +54,6 @@ EventRecorder = Callable[[str, dict[str, object], str | None], None]
 
 
 class PipelineOrchestrator:
-    document_research_breadth = 3
-    document_research_depth = 1
 
     def __init__(
         self,
@@ -79,6 +77,8 @@ class PipelineOrchestrator:
         document_storage: DocumentStorage,
         storage_service: StorageService,
         record_event: EventRecorder | None = None,
+        breadth: int,
+        depth: int,
     ) -> PipelineResult:
         mentions, extraction_context = await self._extract_mentions(
             stored_document=stored_document,
@@ -117,8 +117,8 @@ class PipelineOrchestrator:
         research_requested_context = build_stage_context(
             "ResearchRequested",
             model=getattr(self.research_service, "model", None) or "local",
-            breadth=self.document_research_breadth,
-            depth=self.document_research_depth,
+            breadth=breadth,
+            depth=depth,
         )
         self._record(
             storage_service,
@@ -136,6 +136,8 @@ class PipelineOrchestrator:
         try:
             research_results = await self._call_research_service(
                 technology_names,
+                breadth=breadth,
+                depth=depth,
                 progress_callback=self._build_research_progress_callback(
                     storage_service,
                     record_event,
@@ -290,33 +292,6 @@ class PipelineOrchestrator:
                 ),
             ) from error
 
-    async def run(self, mentions: list[TechnologyMention]) -> PipelineResult:
-        normalized_mentions = await self.normalization_service.normalize(mentions)
-        research_results = await self.research_service.research(self._technology_names(normalized_mentions))
-        comparisons, risks, recommendations = self.scoring_service.score(normalized_mentions, research_results)
-        source_items: list[SourceItem] = []
-        report = self.reporting_service.build_report(
-            report_id="report-0001",
-            document_scope=[],
-            executive_summary="",
-            mentions=normalized_mentions,
-            research_results=research_results,
-            comparisons=comparisons,
-            risks=risks,
-            recommendations=recommendations,
-            sources=source_items,
-        )
-        return PipelineResult(
-            mentions=mentions,
-            normalized_mentions=normalized_mentions,
-            research_results=research_results,
-            comparisons=comparisons,
-            risks=risks,
-            recommendations=recommendations,
-            report=report,
-            report_id="report-0001",
-        )
-
     def _technology_names(self, mentions: list[TechnologyMention]) -> list[str]:
         names: list[str] = []
         seen: set[str] = set()
@@ -388,12 +363,14 @@ class PipelineOrchestrator:
         self,
         technology_names: list[str],
         *,
+        breadth: int,
+        depth: int,
         progress_callback: Callable[[TechnologyResearch, int, int], None] | None = None,
     ) -> list[TechnologyResearch]:
         return await self.research_service.research(
             technology_names,
-            breadth=self.document_research_breadth,
-            depth=self.document_research_depth,
+            breadth=breadth,
+            depth=depth,
             progress_callback=progress_callback,
         )
 

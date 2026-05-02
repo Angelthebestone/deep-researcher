@@ -20,11 +20,11 @@ GEMMA_4_WEB_SEARCH_MODELS = {
     GEMMA_4_26B_MODEL,
 }
 GEMMA_4_WEB_SEARCH_TOOLS = WEB_SEARCH_TOOLS
-MISTRAL_WEB_SEARCH_MODEL = "mistral-small-latest"
-MISTRAL_WEB_SEARCH_TOOLS = [{"type": "web_search"}]
+MISTRAL_WEB_SEARCH_MODEL = "magistral-medium-latest"
+MISTRAL_WEB_SEARCH_TOOLS = [{"type": "web_search_premium"}]
 MISTRAL_WEB_SEARCH_AGENT_TOOLS = MISTRAL_WEB_SEARCH_TOOLS
 MISTRAL_WEB_SEARCH_REASONING_EFFORT = "high"
-MISTRAL_REVIEW_MODEL = "mistral-large-2512"
+MISTRAL_REVIEW_MODEL = "mistral-large-latest"
 
 GEMMA_4_PROMPT_ENGINEERING_SYSTEM_INSTRUCTION = (
     "You are a Prompt Engineer specialized in technology surveillance. "
@@ -42,27 +42,31 @@ GEMINI_WEB_SEARCH_TIMEOUT_SECONDS = 120.0
 MISTRAL_WEB_SEARCH_TIMEOUT_SECONDS = 90.0
 MISTRAL_REVIEW_TIMEOUT_SECONDS = 90.0
 
-GEMMA_4_RESEARCH_PLAN_RESPONSE_SCHEMA = {
-    "type": "OBJECT",
-    "required": ["plan_summary", "gemini_queries", "mistral_queries"],
-    "properties": {
-        "plan_summary": {"type": "STRING"},
-        "gemini_queries": {
-            "type": "ARRAY",
-            "items": {"type": "STRING"},
-        },
-        "mistral_queries": {
-            "type": "ARRAY",
-            "items": {"type": "STRING"},
-        },
-    },
-}
+# GEMMA_4_RESEARCH_PLAN_RESPONSE_SCHEMA = {
+#     "type": "OBJECT",
+#     "required": ["plan_summary", "gemini_queries", "mistral_queries"],
+#     "properties": {
+#         "plan_summary": {"type": "STRING"},
+#         "gemini_queries": {
+#             "type": "ARRAY",
+#             "items": {"type": "STRING"},
+#         },
+#         "mistral_queries": {
+#             "type": "ARRAY",
+#             "items": {"type": "STRING"},
+#         },
+#     },
+# }
 
 GEMMA_4_RESEARCH_PLAN_SYSTEM_INSTRUCTION = (
     "You are a research planner for a technology surveillance system. "
-    "Return ONLY valid JSON with keys plan_summary, gemini_queries, and mistral_queries. "
-    "Each query list must contain distinct search queries that can be executed serially. "
-    "Do not return markdown, prose outside JSON, or extra keys."
+    "Return plain text only with these exact labels:\n"
+    "Plan summary:\n"
+    "Branch A queries:\n"
+    "Branch B queries:\n"
+    "Branch C queries:\n"
+    "Write one query per line or separate them with semicolons. "
+    "Do not return JSON, markdown tables, or code fences."
 )
 
 GEMMA_4_RESEARCH_ANALYSIS_RESPONSE_SCHEMA = {

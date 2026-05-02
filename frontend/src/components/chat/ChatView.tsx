@@ -44,6 +44,8 @@ export function ChatView() {
   const researchParams = workspace?.researchParams ?? {
     depth: 2,
     breadth: 3,
+    freshness: "past_year",
+    max_sources: 10,
     contextFiles: [],
   };
   const setResearchParam = useWorkspaceStore((state) => state.setResearchParam);
@@ -269,6 +271,43 @@ export function ChatView() {
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>Focalizado</span>
                       <span>Panorámico</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-foreground">Antigüedad</span>
+                      <Chip size="sm" variant="flat">
+                        {researchParams.freshness === "past_month" ? "Último mes" : researchParams.freshness === "past_year" ? "Último año" : "Cualquier fecha"}
+                      </Chip>
+                    </div>
+                    <select
+                      value={researchParams.freshness}
+                      onChange={(e) => setResearchParam("freshness", e.target.value)}
+                      className="w-full text-sm bg-transparent border border-border/30 rounded-lg p-2 text-foreground"
+                    >
+                      <option value="past_month">Último mes</option>
+                      <option value="past_year">Último año</option>
+                      <option value="any">Cualquier fecha</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-foreground">Fuentes máximas</span>
+                      <Chip size="sm" variant="flat">{researchParams.max_sources}</Chip>
+                    </div>
+                    <Slider
+                      size="sm"
+                      minValue={1}
+                      maxValue={20}
+                      value={researchParams.max_sources}
+                      onChange={(v: number) => setResearchParam("max_sources", Number(v))}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>1 fuente</span>
+                      <span>20 fuentes</span>
                     </div>
                   </div>
                 </ScrollShadow>

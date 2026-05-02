@@ -183,9 +183,6 @@ class NormalizationService:
     def _extract_text(self, response: dict[str, Any]) -> str:
         return extract_response_text(response)
 
-    def _strip_json_fences(self, text: str) -> str:
-        return strip_json_fences(text)
-
     def _looks_like_prompt_echo(self, text: str) -> bool:
         if not text.lstrip().startswith(("{", "[")):
             return any(pattern.search(text) for pattern in _PROMPT_ECHO_PATTERNS)

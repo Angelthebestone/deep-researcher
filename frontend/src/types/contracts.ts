@@ -10,7 +10,7 @@ export type OperationType = "research" | "analysis";
 export type OperationStatus = "queued" | "running" | "completed" | "failed";
 export type TechnologyCategory = "language" | "framework" | "database" | "cloud" | "tool" | "other";
 export type ResearchStatus = "current" | "deprecated" | "emerging" | "unknown";
-export type ResearchBranchProvider = "gemini_grounded" | "mistral_web_search";
+export type ResearchBranchProvider = "gemini_grounded" | "mistral_web_search" | "openrouter_search";
 export type EvidenceType = "text" | "ocr" | "table" | "figure" | "caption";
 export type RecommendationPriority = "critical" | "high" | "medium" | "low";
 export type EffortLevel = "low" | "medium" | "high";
@@ -259,6 +259,10 @@ export interface DocumentMentionsResponse {
 
 export interface DocumentAnalyzeRequest {
   idempotency_key?: string | null;
+  breadth: number;
+  depth: number;
+  freshness: string;
+  max_sources: number;
 }
 
 export interface DocumentAnalyzeResponse {
@@ -311,7 +315,8 @@ export interface AnalysisStreamEvent {
   idempotency_key: string;
   details: Record<string, unknown>;
   stage_context?: StageContext;
-  report?: TechnologyReport | string;
+  report_markdown?: string;
+  report_artifact?: TechnologyReport;
 }
 
 export type ChatStreamEvent = AnalysisStreamEvent;

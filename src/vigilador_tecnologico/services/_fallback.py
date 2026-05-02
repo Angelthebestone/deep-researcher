@@ -1,23 +1,9 @@
 from __future__ import annotations
 
-from typing import Final, Literal
+from typing import Final
 
+from vigilador_tecnologico.contracts.models import FallbackReason
 from vigilador_tecnologico.integrations import GeminiAdapterError, MistralAdapterError
-
-
-# Canonical fallback reason taxonomy.
-# Every fallback_reason field in the system MUST be one of these values.
-FallbackReason = Literal[
-    "timeout",
-    "invalid_json",
-    "empty_response",
-    "provider_failure",
-    "grounded_postprocess",
-    "planner_fallback",
-    "gemini_timeout_to_mistral",
-    "empty_local_fallback",
-    "invalid_local_fallback",
-]
 
 
 class ResponsePayloadError(RuntimeError):

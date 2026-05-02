@@ -21,6 +21,8 @@ export interface Workspace {
   researchParams: {
     depth: number;
     breadth: number;
+    freshness: string;
+    max_sources: number;
     contextFiles: File[];
   };
   currentOperation: OperationRecord | null;

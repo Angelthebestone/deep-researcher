@@ -117,6 +117,12 @@ __all__ = [
 	"get_gemini_key",
 	"get_groq_key",
 	"get_mistral_key",
+	"get_openrouter_key",
+	"get_nvidia_key",
+	"get_huggingface_key",
+	"get_tavily_key",
+	"get_exa_key",
+	"get_serper_key",
 	"get_secret",
 	"load_dotenv",
 ]

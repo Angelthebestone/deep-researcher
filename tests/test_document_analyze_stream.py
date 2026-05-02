@@ -170,7 +170,14 @@ class DocumentAnalyzeStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(upload_response.status_code, 201)
         document_id = upload_response.json()["document_id"]
 
-        response = await documents_module.stream_document_analysis(document_id, idempotency_key="analysis-stream-1")
+        response = await documents_module.stream_document_analysis(
+            document_id,
+            idempotency_key="analysis-stream-1",
+            breadth=3,
+            depth=2,
+            freshness="past_year",
+            max_sources=10,
+        )
         self.assertEqual(response.media_type, "text/event-stream")
 
         payloads = []
@@ -209,7 +216,14 @@ class DocumentAnalyzeStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(operation_record["status"], "completed")
         self.assertGreaterEqual(operation_record["event_count"], len(payloads) + 2)
 
-        second_response = await documents_module.stream_document_analysis(document_id, idempotency_key="analysis-stream-1")
+        second_response = await documents_module.stream_document_analysis(
+            document_id,
+            idempotency_key="analysis-stream-1",
+            breadth=3,
+            depth=2,
+            freshness="past_year",
+            max_sources=10,
+        )
         self.assertEqual(second_response.media_type, "text/event-stream")
 
         second_payloads = []
@@ -248,7 +262,14 @@ class DocumentAnalyzeStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(upload_response.status_code, 201)
             document_id = upload_response.json()["document_id"]
 
-            response = await documents_module.stream_document_analysis(document_id, idempotency_key="analysis-timeout-recovery")
+            response = await documents_module.stream_document_analysis(
+                document_id,
+                idempotency_key="analysis-timeout-recovery",
+                breadth=3,
+                depth=2,
+                freshness="past_year",
+                max_sources=10,
+            )
             payloads = []
             async for chunk in response.body_iterator:
                 payloads.append(_parse_sse_chunk(chunk))
@@ -303,8 +324,15 @@ class DocumentAnalyzeStreamIntegrationTest(unittest.IsolatedAsyncioTestCase):
             details={"document_id": stored_document.document_id},
         )
 
+        class _FakeAnalyzeRequest:
+            idempotency_key = None
+            breadth = 3
+            depth = 2
+            freshness = "past_year"
+            max_sources = 10
+
         with patch.object(documents_module, "_load_or_parse", side_effect=TimeoutError("The read operation timed out")):
-            await documents_module._execute_analysis_operation(stored_document, str(operation["operation_id"]))
+            await documents_module._execute_analysis_operation(stored_document, str(operation["operation_id"]), _FakeAnalyzeRequest())
 
         failed_record = self.operation_journal.load(str(operation["operation_id"]))
         self.assertEqual(failed_record["status"], "failed")

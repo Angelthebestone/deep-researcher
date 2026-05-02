@@ -98,15 +98,11 @@
         }
       }
     },
-    "report": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "$ref": "technology_report.schema.json"
-        }
-      ]
+    "report_markdown": {
+      "type": "string"
+    },
+    "report_artifact": {
+      "$ref": "technology_report.schema.json"
     }
   }
 }

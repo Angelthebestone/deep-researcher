@@ -9,7 +9,7 @@ OperationType = Literal["research", "analysis"]
 OperationStatus = Literal["queued", "running", "completed", "failed"]
 TechnologyCategory = Literal["language", "framework", "database", "cloud", "tool", "other"]
 ResearchStatus = Literal["current", "deprecated", "emerging", "unknown"]
-ResearchBranchProvider = Literal["gemini_grounded", "mistral_web_search"]
+ResearchBranchProvider = Literal["gemini_grounded", "mistral_web_search", "openrouter_search"]
 EvidenceType = Literal["text", "ocr", "table", "figure", "caption"]
 RecommendationPriority = Literal["critical", "high", "medium", "low"]
 EffortLevel = Literal["low", "medium", "high"]
@@ -64,7 +64,7 @@ class AlternativeTechnology(TypedDict):
 class StageContext(TypedDict):
     """Contexto de etapa para trazabilidad SSE y audit log.
     
-    Campos esenciales (6 en total):
+    Campos esenciales (7 en total):
     - stage: Nombre de la etapa (requerido)
     - model: Modelo usado (opcional)
     - fallback_reason: Razón de fallback (opcional)
@@ -88,6 +88,8 @@ class ResearchRequest(TypedDict):
     document_id: str
     breadth: int
     depth: int
+    freshness: str
+    max_sources: int
     idempotency_key: str
 
 
@@ -263,15 +265,16 @@ class OperationRecord(TypedDict):
     message: NotRequired[str]
     details: NotRequired[dict[str, Any]]
     error: NotRequired[str]
+    events: NotRequired[list[OperationEvent]]
     event_count: NotRequired[int]
 
 
 class AnalysisStreamEvent(TypedDict):
     """Evento de progreso SSE para streaming en vivo al dashboard.
-    
-    Campos esenciales (12 en total):
+
+    Campos esenciales (13 en total):
     - 10 campos requeridos para identificación y estado
-    - 2 campos opcionales (stage_context, report)
+    - 3 campos opcionales (stage_context, report_markdown, report_artifact)
     """
     event_id: str
     sequence: int
@@ -284,4 +287,5 @@ class AnalysisStreamEvent(TypedDict):
     idempotency_key: str
     details: dict[str, Any]
     stage_context: NotRequired[StageContext]
-    report: NotRequired[TechnologyReport | str]
+    report_markdown: NotRequired[str]
+    report_artifact: NotRequired[TechnologyReport]

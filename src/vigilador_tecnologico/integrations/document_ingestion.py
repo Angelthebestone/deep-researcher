@@ -31,7 +31,7 @@ from vigilador_tecnologico.integrations.model_profiles import (
     GEMINI_ROBOTICS_ER_16_MODEL,
     GEMMA_4_26B_MODEL,
 )
-from vigilador_tecnologico.integrations.retry import call_with_retry
+from vigilador_tecnologico.integrations.retry import async_call_with_retry
 
 
 _PDF_STREAM_PATTERN = re.compile(rb"stream\r?\n(.*?)\r?\nendstream", re.S)
@@ -62,7 +62,7 @@ class DocumentIngestionError(RuntimeError):
 
 
 class DocumentIngestionAdapter:
-    def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
+    async def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
         path = _resolve_source_path(source_uri)
         if not path.exists():
             raise DocumentIngestionError(f"Document not found: {source_uri}")
@@ -109,7 +109,7 @@ class ModelDocumentIngestionAdapter:
         self.retry_delay_seconds = retry_delay_seconds
         self.timeout_seconds = timeout_seconds
 
-    def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
+    async def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
         path = _resolve_source_path(source_uri)
         if not path.exists():
             raise DocumentIngestionError(f"Document not found: {source_uri}")
@@ -123,7 +123,7 @@ class ModelDocumentIngestionAdapter:
         last_error: Exception | None = None
         for model in (self.primary_model, self.secondary_model, self.fallback_model):
             try:
-                return self._ingest_with_model(
+                return await self._ingest_with_model(
                     model=model,
                     source_uri=source_uri,
                     source_type=resolved_type,
@@ -137,7 +137,7 @@ class ModelDocumentIngestionAdapter:
             raise DocumentIngestionError(str(last_error)) from last_error
         raise DocumentIngestionError("Model ingestion failed without a provider error")
 
-    def _ingest_with_model(
+    async def _ingest_with_model(
         self,
         *,
         model: str,
@@ -163,7 +163,7 @@ class ModelDocumentIngestionAdapter:
                 pix = page.get_pixmap(matrix=fitz.Matrix(300 / 72, 300 / 72))  # 300 DPI
                 img_bytes = pix.tobytes("jpg")
 
-                response = call_with_retry(
+                response = await async_call_with_retry(
                     adapter.generate_content_parts,
                     [
                         {"text": self._prompt(source_type)},
@@ -193,7 +193,7 @@ class ModelDocumentIngestionAdapter:
             doc.close()
         else:
             # Standard multimodal path
-            response = call_with_retry(
+            response = await async_call_with_retry(
                 adapter.generate_content_parts,
                 [
                     {"text": self._prompt(source_type)},
@@ -258,15 +258,15 @@ class MultimodalDocumentIngestionAdapter:
         self.model_adapter = model_adapter or ModelDocumentIngestionAdapter()
         self.local_adapter = local_adapter or DocumentIngestionAdapter()
 
-    def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
+    async def ingest(self, source_uri: str, source_type: str | None = None) -> IngestedDocument:
         resolved_type = self._resolve_type_for_routing(source_uri, source_type)
         if resolved_type not in _COMPLEX_SOURCE_TYPES:
-            return self.local_adapter.ingest(source_uri, source_type)
+            return await self.local_adapter.ingest(source_uri, source_type)
 
         try:
-            return self.model_adapter.ingest(source_uri, source_type)
+            return await self.model_adapter.ingest(source_uri, source_type)
         except Exception as error:
-            fallback = self.local_adapter.ingest(source_uri, source_type)
+            fallback = await self.local_adapter.ingest(source_uri, source_type)
             return IngestedDocument(
                 source_uri=fallback.source_uri,
                 source_type=fallback.source_type,

@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from vigilador_tecnologico.contracts.models import ResearchBranchResult, ResearchPlanBranch
-from vigilador_tecnologico.integrations import GeminiAdapter, MistralAdapter
+from vigilador_tecnologico.integrations import GeminiAdapter, MistralAdapter, OpenRouterAdapter
+from vigilador_tecnologico.integrations.search.router import SearchRouter
 from vigilador_tecnologico.integrations.model_profiles import (
     GEMINI_WEB_SEARCH_MODEL,
     GEMMA_4_26B_MODEL,
@@ -32,6 +33,8 @@ class ResearchWorker:
     mistral_search_adapter: MistralAdapter | None = None
     gemma_analyst_adapter: GeminiAdapter | None = None
     mistral_review_adapter: MistralAdapter | None = None
+    openrouter_adapter: OpenRouterAdapter | None = None
+    search_router: SearchRouter | None = None
     web_search_service: WebSearchService | None = None
     research_analysis_service: ResearchAnalysisService | None = None
     embedding_service: EmbeddingService | None = None
@@ -78,7 +81,7 @@ class ResearchWorker:
                 iteration_count += 1
                 search_output = await self._get_web_search_service().search_branch(
                     branch,
-                    query=normalized_query,
+                    queries=[normalized_query],
                     target_technology=target_technology,
                 )
                 if isinstance(search_output, dict) and search_output.get("fallback_provider"):
@@ -142,9 +145,6 @@ class ResearchWorker:
             depth=depth,
         )
         return ResearchBranchExecution(branch_result=branch_result, stage_context=stage_context)
-
-    async def _run_mistral_search_conversation(self, inputs: list[dict[str, Any]]) -> dict[str, Any]:
-        return await self._get_web_search_service().run_mistral_search_conversation(inputs)
 
     def _sanitize_queries(self, queries: list[str], breadth: int) -> list[str]:
         cleaned: list[str] = []
@@ -219,6 +219,8 @@ class ResearchWorker:
             self.web_search_service = WebSearchService(
                 gemini_adapter=self._get_gemini_adapter(),
                 mistral_adapter=self._get_mistral_search_adapter(),
+                openrouter_adapter=self.openrouter_adapter,
+                search_router=self.search_router,
                 retry_attempts=self.retry_attempts,
                 retry_delay_seconds=self.retry_delay_seconds,
                 retry_backoff_factor=self.retry_backoff_factor,

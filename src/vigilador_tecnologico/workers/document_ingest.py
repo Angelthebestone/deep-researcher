@@ -22,8 +22,8 @@ class DocumentIngestWorker:
     def __init__(self, adapter: object | None = None) -> None:
         self.adapter = adapter or MultimodalDocumentIngestionAdapter()
 
-    def ingest(self, source_uri: str, source_type: str, document_id: str) -> IngestResult:
-        ingested = self.adapter.ingest(source_uri, source_type)
+    async def ingest(self, source_uri: str, source_type: str, document_id: str) -> IngestResult:
+        ingested = await self.adapter.ingest(source_uri, source_type)
         return IngestResult(
             document_id=document_id,
             source_type=ingested.source_type,
@@ -37,5 +37,5 @@ class DocumentIngestWorker:
         )
 
 
-def ingest_document(source_uri: str, source_type: str, document_id: str) -> IngestResult:
-    return DocumentIngestWorker().ingest(source_uri, source_type, document_id)
+async def ingest_document(source_uri: str, source_type: str, document_id: str) -> IngestResult:
+    return await DocumentIngestWorker().ingest(source_uri, source_type, document_id)
